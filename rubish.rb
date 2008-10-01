@@ -1,3 +1,40 @@
+# to start,
+#
+# s = Rubish::Session.new
+# s.repl
+## now you have a prompt
+#
+# any missing method is considered a bash command.
+# args are Strings
+# option flags are Symbols
+#
+## list directory
+# > ls
+# > ls :lh
+# > ls :lh, "~"
+#
+# no safe quoting yet, so play safe.
+#
+# Rubish is designed to interface well with ruby. Usually a shell
+# command just outputs and returns the exit status. To get a value,
+# pass a block in,
+#
+# > ls{}
+# skip the first line, select all sym links in directory
+# > ls(:lh,"~"){}[1..-1].select {|l| l =~ /->/ }
+#
+# What does a block to shell comand do? It's a meta syntax to set
+# various shell options.
+#
+# > ls{} # is actually a short hand for,
+# > ls{objectify} # the default objectifier is :split_lines. You can define something eles.
+# > ls{objectify(:some_other_objectifier)}
+#
+# The same mechanism is used for io redirection, but not implemented yet.
+#
+# > ls { in="some-file"; out="some-other-file"}
+
+
 require 'pp'
 require 'fileutils'
 
