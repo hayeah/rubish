@@ -158,8 +158,7 @@ class Rubish::Bash
       if method = opts[:objectify]
         r = objectifier.send(method,r) 
       end 
-    else
-      puts r
+    else 
       r = status 
     end
     return r
