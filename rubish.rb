@@ -166,25 +166,8 @@ class Rubish::Bash
 
   private
   def parse_args
-    if args.last.is_a? Regexp
-      raise "this is probably stupid. Don't support it."
-      opts = args.pop
-      opts = /\/(.*)\//
-      flags = $1
-      process_flags(flags) if !flags.empty?
-    end
+    #
   end
-
-#   def process_flags(flags)
-#     flags.each_byte do |c|
-#       case c
-#       when ?o
-#         self.objectify
-#       else
-#         raise SyntaxError.new "unknown bash flag: #{c}"
-#       end
-#     end
-#   end
 
   def build_command_string 
     args.map! do |arg|
@@ -238,7 +221,7 @@ class Rubish::Session
   end
 
   def repl
-    # don't ever try to do anything with mu except instance eval
+    # don't ever try to do anything with mu except Mu#__instance_eval
     mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
     mu.__extend Rubish::Base
     begin
@@ -246,7 +229,11 @@ class Rubish::Session
       loop do
         line = read
         if line
-          pp mu.__instance_eval(line)
+          begin
+            pp mu.__instance_eval(line)
+          rescue StandardError, ScriptError => e
+            puts e
+          end
         else
           next
         end 
