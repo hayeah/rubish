@@ -39,6 +39,15 @@ require 'pp'
 require 'fileutils'
 
 module Rubish
+  class << self
+    attr_accessor :session
+  end
+end
+
+class Rubish::Objectifier
+  def split_lines(output)
+    output.split "\n"
+  end
 end
 
 class Rubish::Bash
@@ -113,8 +122,8 @@ class Rubish::Bash
     end
     
     if use_value
-      if objectifier = opts[:objectify]
-        r=self.send(objectifier,r)
+      if method = opts[:objectify]
+        r = objectifier.send(method,r) 
       end 
     else
       puts r
@@ -153,7 +162,7 @@ class Rubish::Bash
       when String
         arg # should escape for bash
       else
-        raise SyntaxError.new "bash arg should be a Symbol or String: #{arg}"
+        raise SyntaxError.new("bash arg should be a Symbol or String: #{arg}") 
       end
     end
     "#{exe} #{args.join " "}"
@@ -165,13 +174,19 @@ class Rubish::Bash
     # the basic objectifier simply split output into lines
     opts[:objectify] = value
   end
-  
-  def split_lines(output)
-    output.split "\n"
+
+  def objectifier
+    Rubish.session.objectifier
   end
+  
 end
 
 class Rubish::Session
+
+  attr_accessor :objectifier
+  def initialize
+    @objectifier = Rubish::Objectifier.new 
+  end
   
   # calling private method also goes here
   def method_missing(m,*args,&block) 
@@ -189,14 +204,31 @@ class Rubish::Session
   end
 
   def repl
-    loop do
-      line = read
-      if line
-        pp self.instance_eval(line)
-      else
-        next
-      end 
+    begin
+      attach_session
+      loop do
+        line = read
+        if line
+          pp self.instance_eval(line)
+        else
+          next
+        end 
+      end
+    ensure
+      detach_session
     end
+  end
+
+  def attach_session
+    Rubish.session = self
+  end
+
+  def detach_session
+    if Rubish.session == self
+      Rubish.session = nil
+    else
+      raise "#{self} is not attached"
+    end 
   end
   
   def read
@@ -209,10 +241,6 @@ class Rubish::Session
   end
 
   alias_method :h, :history
-
-  private
-  def foo
-    "foo"
-  end
+  
 
 end
