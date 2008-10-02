@@ -113,10 +113,8 @@ class Rubish::Bash
   attr_reader :cmd, :opts
   def initialize(cmd,args,block)
     @exe = cmd
-    @args = args.flatten 
-    @opts = {}
     @status = nil
-    parse_args
+    parse_args(args)
     if block
       # if we get a block, assume we are objectifying.
       self.send(:objectify)
@@ -126,12 +124,21 @@ class Rubish::Bash
   end
 
   def exec
-    use_value = true if opts[:objectify]
-    if use_value
-      r = `#{cmd}`
-    else
-      r = system(cmd)
-    end 
+    use_value = true if opts[:objectify] 
+    
+    r = []
+    IO.popen(cmd) do |io|
+      io.each_line do |line|
+        if filter
+          next if not(line =~ filter) 
+        end 
+        if use_value
+          r << line.chomp!
+        else
+          puts line
+        end
+      end
+    end
     
     @status = $?.exitstatus
     if status != 0
@@ -141,7 +148,11 @@ class Rubish::Bash
     
     if use_value
       if method = opts[:objectify]
-        r = objectifier.send(method,r) 
+        if method == true
+          # use each line as is
+        else
+          r = objectifier.send(method,r)
+        end 
       end 
     else 
       r = status 
@@ -150,28 +161,68 @@ class Rubish::Bash
   end
 
   private
-  def parse_args
-    #
+
+  attr_reader :bash_args, :filter, :range, :opts
+  def parse_args(args)
+    # filters
+    # opts
+    @bash_args = []
+    loop do
+      case args.first
+      when String, Array, Symbol
+        @bash_args << args.shift
+      else
+        break
+      end 
+    end
+    @bash_args = @bash_args.flatten
+
+    @filter = nil
+    @range = nil
+    loop do
+      case args.first
+      when Regexp
+        syntax_error "Only one filter is allowed" if @filter
+        @filter = args.shift
+      when Integer, Range
+        syntax_error "Only one range is allowed" if @range
+        syntax_error "Integer and Range not supported as filter yet"
+      else
+        break
+      end
+    end
+
+    # meta options are optional
+    if !args.empty?
+      @opts = args.shift
+      syntax_error "last argument should be hash of meta options: #{@opts}" if !@opts.is_a?(Hash)
+    else
+      @opts = {}
+    end
+    
+    syntax_error "left over arguments: #{args.join ","}" if args.length > 0 
   end
 
   def build_command_string 
-    args.map! do |arg|
+    args = bash_args.map do |arg|
       case arg
       when Symbol
         "-#{arg}"
       when String
         arg # should escape for bash
       else
-        raise SyntaxError.new("bash arg should be a Symbol or String: #{arg}") 
+        syntax_error "bash arg should be a Symbol or String: #{arg}" 
       end
     end
     "#{exe} #{args.join " "}"
   end
 
+  def syntax_error(reason)
+    raise SyntaxError.new(reason)
+  end
+
   # be careful that order that options are specified shouldn't affect output.
-  def objectify(value=:split_lines)
-    # if a symbol, call that symbol as method when objectifying
-    # the basic objectifier simply split output into lines
+  def objectify(value=true) 
     opts[:objectify] = value
   end
 
