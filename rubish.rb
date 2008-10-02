@@ -44,6 +44,35 @@ module Rubish
   end
 end
 
+# This is an object that doesn't respond to anything.
+#
+# This provides an empty context for instance_eval (__instance_eval
+# for the Mu object). It catches all method calls with method_missing.
+# It is All and Nothing. 
+class Rubish::Mu
+  self.public_instance_methods.each do |m|
+    if m[0..1] != "__"
+      self.send(:alias_method,"__#{m}",m)
+      self.send(:undef_method,m)
+    end 
+  end
+  
+  def initialize(&block)
+    @missing_method_handler = block
+  end
+
+  def method_missing(method,*args,&block)
+    if @missing_method_handler
+      @missing_method_handler.call(method,args,block)
+    else
+      print "missing: #{method}"
+      print "args:"
+      pp args
+      puts "block: #{block}"
+    end
+  end
+end
+
 class Rubish::Objectifier
   def split_lines(output)
     output.split "\n"
@@ -112,9 +141,13 @@ class Rubish::Bash
   end
 
   def exec
-    use_value = !opts.empty?
-    r = `#{cmd}`
-
+    use_value = true if opts[:objectify]
+    if use_value
+      r = `#{cmd}`
+    else
+      r = system(cmd)
+    end 
+    
     @status = $?.exitstatus
     if status != 0
       reason = r
@@ -181,6 +214,12 @@ class Rubish::Bash
   
 end
 
+module Rubish::Base
+  def cd(dir)
+    FileUtils.cd File.expand_path(dir)
+  end
+end
+
 class Rubish::Session
 
   attr_accessor :objectifier
@@ -189,7 +228,7 @@ class Rubish::Session
   end
   
   # calling private method also goes here
-  def method_missing(m,*args,&block) 
+  def mu_handler(m,args,block) 
     m = m.to_s
     if block
       bash = Rubish::Bash.build(m,*args,&block)
@@ -199,17 +238,16 @@ class Rubish::Session
     bash.exec
   end
 
-  def cd(dir)
-    FileUtils.cd File.expand_path(dir)
-  end
-
   def repl
+    # don't ever try to do anything with mu except instance eval
+    mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
+    mu.__extend Rubish::Base
     begin
       attach_session
       loop do
         line = read
         if line
-          pp self.instance_eval(line)
+          pp mu.__instance_eval(line)
         else
           next
         end 
