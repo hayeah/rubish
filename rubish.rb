@@ -99,23 +99,8 @@ class Rubish::Bash
   end
 
   class << self
-    
-    def build(cmd,*args,&block) 
-      if block
-        bash = self.new(cmd,*args,&block)
-      else
-        bash = self.new(cmd,*args) 
-      end
-      bash
-    end 
-    
-    def exec(cmd,*args,&block)
-      if block
-        bash = self.build(cmd,*args,&block)
-      else
-        bash = self.build(cmd,*args) 
-      end
-      bash.exec
+    def build(cmd,args,&block)
+      self.new(cmd,args,block)
     end
   end
   # sh = Bash.new(cmd,*args)
@@ -126,7 +111,7 @@ class Rubish::Bash
   # sh.in = <io>
   attr_reader :exe, :args, :status
   attr_reader :cmd, :opts
-  def initialize(cmd,*args,&block)
+  def initialize(cmd,args,block)
     @exe = cmd
     @args = args.flatten 
     @opts = {}
@@ -196,9 +181,26 @@ class Rubish::Bash
   
 end
 
+class Rubish::Pipe
+  attr_reader :cmds
+  def initialize(&block)
+    @cmds = []
+    mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
+    mu.__instance_eval(&block)
+  end
+
+  def mu_handler(m,args,block)
+    if m == :ruby
+      @cmds << [args,block]
+    else
+      @cmds << Rubish::Bash.new(m,args,block)
+    end
+  end
+end
+
 module Rubish::Base
   def cd(dir)
-    FileUtils.cd File.expand_path(dir)
+    FileUtils.cd File.expand_path(dir) 
   end
 end
 
@@ -212,11 +214,7 @@ class Rubish::Session
   # calling private method also goes here
   def mu_handler(m,args,block) 
     m = m.to_s
-    if block
-      bash = Rubish::Bash.build(m,*args,&block)
-    else
-      bash = Rubish::Bash.build(m,*args)
-    end 
+    bash = Rubish::Bash.new(m,args,block)
     bash.exec
   end
 
