@@ -99,7 +99,7 @@ class Rubish::Bash
   attr_reader :cmd, :opts
   def initialize(cmd,*args,&block)
     @exe = cmd
-    @args = args 
+    @args = args.flatten 
     @opts = {}
     @status = nil
     parse_args
