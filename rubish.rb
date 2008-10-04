@@ -50,6 +50,16 @@ end
 # for the Mu object). It catches all method calls with method_missing.
 # It is All and Nothing. 
 class Rubish::Mu
+  class << self
+    def singleton(*modules)
+      mu = self.new
+      modules.each do |mod|
+        mu.__extend(mod)
+      end
+      mu
+    end
+  end
+  
   self.public_instance_methods.each do |m|
     if m[0..1] != "__"
       self.send(:alias_method,"__#{m}",m)
@@ -166,6 +176,7 @@ class Rubish::Bash
   def parse_args(args)
     # filters
     # opts
+    args = args.clone
     @bash_args = []
     loop do
       case args.first
