@@ -136,8 +136,16 @@ class Rubish::Bash
   def exec
     use_value = true if opts[:objectify] 
     
-    r = []
-    IO.popen(cmd) do |io|
+    if range.is_a?(Integer)
+      command = "#{cmd} | head -n #{range.abs}" if range > 0
+      command = "#{cmd} | tail -n #{range.abs}" if range  < 0
+    elsif range.is_a?(Range)
+      command = "#{cmd} | tail -n +#{range.min} | head -n #{range.max - range.min}"
+    else
+      command = cmd
+    end
+    
+    IO.popen(command) do |io|
       io.each_line do |line|
         if filter
           next if not(line =~ filter) 
@@ -146,8 +154,8 @@ class Rubish::Bash
           r << line.chomp!
         else
           puts line
-        end
-      end
+        end 
+      end 
     end
     
     @status = $?.exitstatus
@@ -189,15 +197,19 @@ class Rubish::Bash
     @bash_args = @bash_args.flatten
 
     @filter = nil
-    @range = nil
+    @lines = nil
     loop do
       case args.first
       when Regexp
         syntax_error "Only one filter is allowed" if @filter
         @filter = args.shift
-      when Integer, Range
+      when Integer
         syntax_error "Only one range is allowed" if @range
-        syntax_error "Integer and Range not supported as filter yet"
+        @range = args.shift
+      when Range
+        syntax_error "Only one range is allowed" if @range
+        @range = args.shift
+        syntax_error "invalid range: #{@range}" if @range.max < @range.min
       else
         break
       end
