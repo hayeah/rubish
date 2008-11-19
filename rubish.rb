@@ -97,14 +97,13 @@ class Rubish::Bash
   end
   
   class BadStatus < BashError
-    attr_reader :status, :reason
-    def initialize(status,reason)
-      @status = status
-      @reason = reason
+    attr_reader :status
+    def initialize(status)
+      @status = status 
     end
 
     def to_s
-      "#{status}: #{reason}"
+      "<##{self.class}: #{status}>"
     end
   end
 
@@ -134,48 +133,49 @@ class Rubish::Bash
   end
 
   def exec
-    use_value = true if opts[:objectify] 
+    if opts[:objectify]
+      capture_value = true
+      read, write = IO.pipe
+    end
     
-    if range.is_a?(Integer)
-      command = "#{cmd} | head -n #{range.abs}" if range > 0
-      command = "#{cmd} | tail -n #{range.abs}" if range  < 0
-    elsif range.is_a?(Range)
-      command = "#{cmd} | tail -n +#{range.min} | head -n #{range.max - range.min}"
+    unless Kernel.fork
+      # child 
+      if capture_value
+        $stdout.reopen(write)
+        read.close
+      end
+      begin
+        Kernel.exec(cmd)
+      rescue
+        cmd_name = cmd.split.first
+        $stderr.puts "#{cmd_name}: command not found"
+        Kernel.exit(127) # that's the bash exit status.
+      end 
+    end
+
+    # parent (shell process itself)
+    if capture_value
+      write.close # don't need the write end of the pipe
+      result = read.readlines
+      read.close  # done with pipe, close it 
+      method = opts[:objectify]
+      if method == true
+        # just return lines as an array. 
+      else
+        result = objectifier.send(method,result)
+      end 
+      _pid, status = Process.waitpid2
     else
-      command = cmd
+      # not capturing output, so just wait for child to finish.
+      _pid, status = Process.waitpid2
+      result = nil # not capturing values
     end
-    
-    IO.popen(command) do |io|
-      io.each_line do |line|
-        if filter
-          next if not(line =~ filter) 
-        end 
-        if use_value
-          r << line.chomp!
-        else
-          puts line
-        end 
-      end 
+
+    if status != 0 
+      raise BadStatus.new(status)
     end
-    
-    @status = $?.exitstatus
-    if status != 0
-      reason = r
-      raise BadStatus.new(status,reason)
-    end
-    
-    if use_value
-      if method = opts[:objectify]
-        if method == true
-          # use each line as is
-        else
-          r = objectifier.send(method,r)
-        end 
-      end 
-    else 
-      r = status 
-    end
-    return r
+ 
+    return result
   end
 
   private
@@ -345,7 +345,8 @@ class Rubish::Session
         line = read
         if line
           begin
-            pp mu.__instance_eval(line)
+            r = mu.__instance_eval(line)
+            pp r if r
           rescue StandardError, ScriptError => e
             puts e
           end
