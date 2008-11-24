@@ -1,3 +1,5 @@
+# load 'rubish.rb' ; ss = Rubish::Session.new ; ss.repl
+#
 # to start,
 #
 # s = Rubish::Session.new
@@ -44,6 +46,7 @@ module Rubish
   end
 end
 
+  
 # This is an object that doesn't respond to anything.
 #
 # This provides an empty context for instance_eval (__instance_eval
@@ -89,7 +92,7 @@ class Rubish::Objectifier
   end
 end
 
-class Rubish::Bash
+class Rubish::BashCommand
   class BashError < RuntimeError
   end
 
@@ -133,51 +136,46 @@ class Rubish::Bash
   end
 
   def exec
-    if opts[:objectify]
-      capture_value = true
-      read, write = IO.pipe
-    end
-    
-    unless Kernel.fork
-      # child 
-      if capture_value
-        $stdout.reopen(write)
-        read.close
-      end
+    unless pid = Kernel.fork
+      # child
       begin
-        Kernel.exec(cmd)
+        Kernel.exec(self.cmd)
       rescue
-        cmd_name = cmd.split.first
+        cmd_name = self.cmd.split.first
         $stderr.puts "#{cmd_name}: command not found"
         Kernel.exit(127) # that's the bash exit status.
       end 
     end
 
-    # parent (shell process itself)
-    if capture_value
-      write.close # don't need the write end of the pipe
-      result = read.readlines
-      read.close  # done with pipe, close it 
-      method = opts[:objectify]
-      if method == true
-        # just return lines as an array. 
-      else
-        result = objectifier.send(method,result)
-      end 
-      _pid, status = Process.waitpid2
-    else
-      # not capturing output, so just wait for child to finish.
-      _pid, status = Process.waitpid2
-      result = nil # not capturing values
-    end
+    _pid, status = Process.waitpid2(pid) # sync
 
     if status != 0 
       raise BadStatus.new(status)
     end
- 
-    return result
+    return nil
   end
 
+  def each
+    IO.popen(self.cmd) do |pipe|
+      pipe.each_line do |line| 
+        line = line.chomp!
+        r = yield(line)
+        # the trick here is that if r happens to be a cmd, it would be executed.
+        Rubish.session.submit(r)
+      end
+    end
+    return nil 
+  end
+
+  # this is a hack s.t. the command is executed when it's printed at the console.
+  def inspect
+    self.exec
+  end
+
+  def to_s
+    self.cmd
+  end
+  
   private
 
   attr_reader :bash_args, :filter, :range, :opts
@@ -272,7 +270,7 @@ class Rubish::Pipe
       raise "not supported yet"
       @cmds << [args,block]
     else
-      @cmds << Rubish::Bash.new(m,args,block)
+      @cmds << Rubish::BashCommand.new(m,args,block)
     end
   end
 
@@ -315,7 +313,7 @@ module Rubish::Base
   def cd(dir)
     FileUtils.cd File.expand_path(dir) 
   end
-
+  
   def pipe(&block)
     Rubish::Pipe.new(&block).exec  
   end
@@ -331,8 +329,7 @@ class Rubish::Session
   # calling private method also goes here
   def mu_handler(m,args,block) 
     m = m.to_s
-    bash = Rubish::Bash.new(m,args,block)
-    bash.exec
+    Rubish::BashCommand.new(m,args,block) 
   end
 
   def repl
@@ -346,9 +343,10 @@ class Rubish::Session
         if line
           begin
             r = mu.__instance_eval(line)
-            pp r if r
+            self.submit(r)
           rescue StandardError, ScriptError => e
             puts e
+            puts e.backtrace
           end
         else
           next
@@ -357,6 +355,22 @@ class Rubish::Session
     ensure
       detach_session
     end
+  end
+
+  def submit(r)
+    # if r is a cmd, execute it.
+    #
+    # don't print nil 
+    ## this special case is nauseating, but it fits the Unix cmd line
+    ## processing model better, where non matched lines (nil) are just
+    ## swallowed.
+    if r.is_a?(Rubish::BashCommand)
+      # is a bash command, so execute it.
+      r.exec 
+    elsif r
+      # normal ruby value
+      pp r
+    end 
   end
 
   def attach_session
@@ -371,7 +385,7 @@ class Rubish::Session
     end 
   end
   
-  def read
+  def read 
     line = Readline.readline('> ')
     Readline::HISTORY.push(line) if !line.empty?
     line
