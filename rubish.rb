@@ -46,12 +46,12 @@ module Rubish
   end
 end
 
-  
+
 # This is an object that doesn't respond to anything.
 #
 # This provides an empty context for instance_eval (__instance_eval
 # for the Mu object). It catches all method calls with method_missing.
-# It is All and Nothing. 
+# It is All and Nothing.
 class Rubish::Mu
   class << self
     def singleton(*modules)
@@ -62,14 +62,14 @@ class Rubish::Mu
       mu
     end
   end
-  
+
   self.public_instance_methods.each do |m|
     if m[0..1] != "__"
       self.send(:alias_method,"__#{m}",m)
       self.send(:undef_method,m)
-    end 
+    end
   end
-  
+
   def initialize(&block)
     @missing_method_handler = block
   end
@@ -98,11 +98,11 @@ class Rubish::BashCommand
 
   class SyntaxError < BashError
   end
-  
+
   class BadStatus < BashError
     attr_reader :status
     def initialize(status)
-      @status = status 
+      @status = status
     end
 
     def to_s
@@ -144,12 +144,12 @@ class Rubish::BashCommand
         cmd_name = self.cmd.split.first
         $stderr.puts "#{cmd_name}: command not found"
         Kernel.exit(127) # that's the bash exit status.
-      end 
+      end
     end
 
     _pid, status = Process.waitpid2(pid) # sync
 
-    if status != 0 
+    if status != 0
       raise BadStatus.new(status)
     end
     return nil
@@ -157,25 +157,20 @@ class Rubish::BashCommand
 
   def each
     IO.popen(self.cmd) do |pipe|
-      pipe.each_line do |line| 
+      pipe.each_line do |line|
         line = line.chomp!
         r = yield(line)
         # the trick here is that if r happens to be a cmd, it would be executed.
         Rubish.session.submit(r)
       end
     end
-    return nil 
-  end
-
-  # this is a hack s.t. the command is executed when it's printed at the console.
-  def inspect
-    self.exec
+    return nil
   end
 
   def to_s
     self.cmd
   end
-  
+
   private
 
   attr_reader :bash_args, :filter, :range, :opts
@@ -190,7 +185,7 @@ class Rubish::BashCommand
         @bash_args << args.shift
       else
         break
-      end 
+      end
     end
     @bash_args = @bash_args.flatten
 
@@ -220,11 +215,11 @@ class Rubish::BashCommand
     else
       @opts = {}
     end
-    
-    syntax_error "left over arguments: #{args.join ","}" if args.length > 0 
+
+    syntax_error "left over arguments: #{args.join ","}" if args.length > 0
   end
 
-  def build_command_string 
+  def build_command_string
     args = bash_args.map do |arg|
       case arg
       when Symbol
@@ -232,7 +227,7 @@ class Rubish::BashCommand
       when String
         arg # should escape for bash
       else
-        syntax_error "bash arg should be a Symbol or String: #{arg}" 
+        syntax_error "bash arg should be a Symbol or String: #{arg}"
       end
     end
     "#{exe} #{args.join " "}"
@@ -243,14 +238,14 @@ class Rubish::BashCommand
   end
 
   # be careful that order that options are specified shouldn't affect output.
-  def objectify(value=true) 
+  def objectify(value=true)
     opts[:objectify] = value
   end
 
   def objectifier
     Rubish.session.objectifier
   end
-  
+
 end
 
 class Rubish::Pipe
@@ -259,9 +254,9 @@ class Rubish::Pipe
     @cmds = []
     if block
       mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
-      mu.__instance_eval(&block) 
+      mu.__instance_eval(&block)
     end
-    # dun wanna handle special case for now 
+    # dun wanna handle special case for now
     raise "pipe length less than 2" if @cmds.length < 2
   end
 
@@ -285,17 +280,17 @@ class Rubish::Pipe
         pipe = IO.pipe
         o = pipe[1] # w
       elsif index == (@cmds.length - 1) # tail
-        i = pipe[0] 
+        i = pipe[0]
         o = $stdout
       else # middle
         i = pipe[0] # r
         pipe = IO.pipe
         o = pipe[1]
       end
-      
+
       cmd = @cmds[index]
       if child = fork # children
-        #parent 
+        #parent
         i.close unless i == $stdin
         o.close unless o == $stdout
       else
@@ -311,11 +306,11 @@ end
 
 module Rubish::Base
   def cd(dir)
-    FileUtils.cd File.expand_path(dir) 
+    FileUtils.cd File.expand_path(dir)
   end
-  
+
   def pipe(&block)
-    Rubish::Pipe.new(&block).exec  
+    Rubish::Pipe.new(&block).exec
   end
 end
 
@@ -323,13 +318,13 @@ class Rubish::Session
 
   attr_accessor :objectifier
   def initialize
-    @objectifier = Rubish::Objectifier.new 
+    @objectifier = Rubish::Objectifier.new
   end
-  
+
   # calling private method also goes here
-  def mu_handler(m,args,block) 
+  def mu_handler(m,args,block)
     m = m.to_s
-    Rubish::BashCommand.new(m,args,block) 
+    Rubish::BashCommand.new(m,args,block)
   end
 
   def repl
@@ -350,7 +345,7 @@ class Rubish::Session
           end
         else
           next
-        end 
+        end
       end
     ensure
       detach_session
@@ -360,17 +355,17 @@ class Rubish::Session
   def submit(r)
     # if r is a cmd, execute it.
     #
-    # don't print nil 
+    # don't print nil
     ## this special case is nauseating, but it fits the Unix cmd line
     ## processing model better, where non matched lines (nil) are just
     ## swallowed.
     if r.is_a?(Rubish::BashCommand)
       # is a bash command, so execute it.
-      r.exec 
+      r.exec
     elsif r
       # normal ruby value
       pp r
-    end 
+    end
   end
 
   def attach_session
@@ -382,19 +377,19 @@ class Rubish::Session
       Rubish.session = nil
     else
       raise "#{self} is not attached"
-    end 
+    end
   end
-  
-  def read 
+
+  def read
     line = Readline.readline('> ')
     Readline::HISTORY.push(line) if !line.empty?
     line
   end
-  
+
   def history
   end
 
   alias_method :h, :history
-  
+
 
 end
