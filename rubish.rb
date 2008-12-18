@@ -42,6 +42,10 @@ require 'fileutils'
 
 module Rubish
   class << self
+    def repl
+      ss = Rubish::Session.new
+      ss.repl
+    end
     attr_accessor :session
   end
 end
@@ -123,6 +127,7 @@ class Rubish::BashCommand
   # sh.in = <io>
   attr_reader :exe, :args, :status
   attr_reader :cmd, :opts
+  attr_reader :input, :output
   def initialize(cmd,args,block)
     @exe = cmd
     @status = nil
@@ -136,16 +141,7 @@ class Rubish::BashCommand
   end
 
   def exec
-    unless pid = Kernel.fork
-      # child
-      begin
-        Kernel.exec(self.cmd)
-      rescue
-        cmd_name = self.cmd.split.first
-        $stderr.puts "#{cmd_name}: command not found"
-        Kernel.exit(127) # that's the bash exit status.
-      end
-    end
+    pid = self.exec_
 
     _pid, status = Process.waitpid2(pid) # sync
 
@@ -153,6 +149,23 @@ class Rubish::BashCommand
       raise BadStatus.new(status)
     end
     return nil
+  end
+
+  def exec_
+    unless pid = Kernel.fork
+      # child
+      begin
+        $stdin.reopen(input) if input
+        $stdout.reopen(output) if output
+        Kernel.exec(self.cmd)
+      rescue
+        puts $!
+        cmd_name = self.cmd.split.first
+        $stderr.puts "#{cmd_name}: command not found"
+        Kernel.exit(127) # that's the bash exit status.
+      end
+    end
+    return pid
   end
 
   def each
@@ -169,6 +182,11 @@ class Rubish::BashCommand
 
   def to_s
     self.cmd
+  end
+
+  def io(i=nil,o=nil)
+    @input = i
+    @output = o
   end
 
   private
@@ -269,7 +287,7 @@ class Rubish::Pipe
     end
   end
 
-  def exec(&block)
+  def exec
     # pipes == [i0,o1,i1,o2,i2...in,o0]
     # i0 == $stdin
     # o0 == $stdout
@@ -299,8 +317,9 @@ class Rubish::Pipe
         Kernel.exec cmd.cmd
       end
     end
+    
     ps = Process.waitall
-    pp ps
+    #pp ps
   end
 end
 
@@ -309,8 +328,8 @@ module Rubish::Base
     FileUtils.cd File.expand_path(dir)
   end
 
-  def pipe(&block)
-    Rubish::Pipe.new(&block).exec
+  def p(&block)
+    Rubish::Pipe.new &block
   end
 end
 
@@ -359,7 +378,8 @@ class Rubish::Session
     ## this special case is nauseating, but it fits the Unix cmd line
     ## processing model better, where non matched lines (nil) are just
     ## swallowed.
-    if r.is_a?(Rubish::BashCommand)
+    if r.is_a?(Rubish::BashCommand) ||
+       r.is_a?(Rubish::Pipe)
       # is a bash command, so execute it.
       r.exec
     elsif r
