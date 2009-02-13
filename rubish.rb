@@ -149,12 +149,6 @@ class Rubish::Arguments
   end
 end
 
-class Rubish::Objectifier
-  def split_lines(output)
-    output.split "\n"
-  end
-end
-
 class Rubish::Command
   class BashError < RuntimeError
   end
@@ -174,8 +168,8 @@ class Rubish::Command
   end
 
   class << self
-    def build(cmd,args,&block)
-      self.new(cmd,args,block)
+    def build(cmd,args)
+      self.new(cmd,args)
     end
   end
   # sh = Bash.new(cmd,*args)
@@ -187,16 +181,11 @@ class Rubish::Command
   attr_reader :exe, :args, :status
   attr_reader :cmd, :opts
   attr_reader :input, :output
-  def initialize(cmd,args,block)
+  def initialize(cmd,args)
     @exe = cmd
     @status = nil
-    parse_args(args)
-    if block
-      # if we get a block, assume we are objectifying.
-      self.send(:objectify)
-      self.instance_eval(&block)
-    end
-    @cmd = build_command_string
+    @args = args.join " "
+    @cmd = "#{exe} #{args}"
   end
 
   def exec
@@ -283,81 +272,6 @@ class Rubish::Command
     self
   end
 
-  private
-
-  attr_reader :bash_args, :filter, :range, :opts
-  def parse_args(args)
-    # filters
-    # opts
-    args = args.clone
-    @bash_args = []
-    loop do
-      case args.first
-      when String, Array, Symbol
-        @bash_args << args.shift
-      else
-        break
-      end
-    end
-    @bash_args = @bash_args.flatten
-
-    @filter = nil
-    @lines = nil
-    loop do
-      case args.first
-      when Regexp
-        syntax_error "Only one filter is allowed" if @filter
-        @filter = args.shift
-      when Integer
-        syntax_error "Only one range is allowed" if @range
-        @range = args.shift
-      when Range
-        syntax_error "Only one range is allowed" if @range
-        @range = args.shift
-        syntax_error "invalid range: #{@range}" if @range.max < @range.min
-      else
-        break
-      end
-    end
-
-    # meta options are optional
-    if !args.empty?
-      @opts = args.shift
-      syntax_error "last argument should be hash of meta options: #{@opts}" if !@opts.is_a?(Hash)
-    else
-      @opts = {}
-    end
-
-    syntax_error "left over arguments: #{args.join ","}" if args.length > 0
-  end
-
-  def build_command_string
-    args = bash_args.map do |arg|
-      case arg
-      when Symbol
-        "-#{arg}"
-      when String
-        arg # should escape for bash
-      else
-        syntax_error "bash arg should be a Symbol or String: #{arg}"
-      end
-    end
-    "#{exe} #{args.join " "}"
-  end
-
-  def syntax_error(reason)
-    raise SyntaxError.new(reason)
-  end
-
-  # be careful that order that options are specified shouldn't affect output.
-  def objectify(value=true)
-    opts[:objectify] = value
-  end
-
-  def objectifier
-    Rubish.session.objectifier
-  end
-
 end
 
 class Rubish::CommandBuilder < Rubish::Command
@@ -440,16 +354,16 @@ end
 
 class Rubish::Session
 
-  attr_accessor :objectifier
   def initialize
-    @objectifier = Rubish::Objectifier.new
     @vars = {}
   end
 
   # calling private method also goes here
   def mu_handler(m,args,block)
+    # block's not actually used
+    raise "command builder doesn't take a block" unless block.nil?
     m = m.to_s
-    Rubish::Command.new(m,args,block)
+    Rubish::Command.new(m,args)
   end
 
   def repl
