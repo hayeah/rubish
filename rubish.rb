@@ -155,7 +155,7 @@ class Rubish::Objectifier
   end
 end
 
-class Rubish::BashCommand
+class Rubish::Command
   class BashError < RuntimeError
   end
 
@@ -227,25 +227,60 @@ class Rubish::BashCommand
     return pid
   end
 
-  def each
-    IO.popen(self.cmd) do |pipe|
-      pipe.each_line do |line|
-        line = line.chomp!
-        r = yield(line)
-        # the trick here is that if r happens to be a cmd, it would be executed.
-        Rubish.session.submit(r)
+  def each_
+    # send output lines to block if command is not already redirected
+    if output.nil?
+      r,w = IO.pipe
+      @output = w
+      pid = self.exec_
+      w.close
+      old_trap = Signal.trap("CHLD") do
+        r.close
+      end
+      Signal.trap("CHLD",&old_trap)
+      r.each_line do |l|
+        yield(l)
+      end
+      _pid, status = Process.waitpid2(pid)
+      if status != 0
+        raise BadStatus.new(status)
       end
     end
     return nil
+  end
+
+  def each
+    self.each_ do |l|
+      Rubish.session.submit(yield(l))
+    end
+  end
+
+  def map
+    acc = []
+    self.each_ do |l|
+      acc << yield(l)
+    end
+    acc
   end
 
   def to_s
     self.cmd
   end
 
+  def i(i)
+    @input = i
+    self
+  end
+
+  def o(o)
+    @output = o
+    self
+  end
+  
   def io(i=nil,o=nil)
     @input = i
     @output = o
+    self
   end
 
   private
@@ -325,6 +360,17 @@ class Rubish::BashCommand
 
 end
 
+class Rubish::CommandBuilder < Rubish::Command
+  attr_reader :a
+  def initialize
+    @a = Rubish::Arguments.new
+  end
+
+  def cmd
+    "#{a.to_s}"
+  end
+end
+
 class Rubish::Pipe
   attr_reader :cmds
   def initialize(&block)
@@ -342,7 +388,7 @@ class Rubish::Pipe
       raise "not supported yet"
       @cmds << [args,block]
     else
-      @cmds << Rubish::BashCommand.new(m,args,block)
+      @cmds << Rubish::Command.new(m,args,block)
     end
   end
 
@@ -397,16 +443,18 @@ class Rubish::Session
   attr_accessor :objectifier
   def initialize
     @objectifier = Rubish::Objectifier.new
+    @vars = {}
   end
 
   # calling private method also goes here
   def mu_handler(m,args,block)
     m = m.to_s
-    Rubish::BashCommand.new(m,args,block)
+    Rubish::Command.new(m,args,block)
   end
 
   def repl
     # don't ever try to do anything with mu except Mu#__instance_eval
+    raise "$stdin is not a tty device" unless $stdin.tty?
     mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
     mu.__extend Rubish::Base
     begin
@@ -431,13 +479,13 @@ class Rubish::Session
   end
 
   def submit(r)
-    # if r is a cmd, execute it.
-    #
     # don't print nil
     ## this special case is nauseating, but it fits the Unix cmd line
     ## processing model better, where non matched lines (nil) are just
     ## swallowed.
-    if r.is_a?(Rubish::BashCommand) ||
+    return if r.nil?
+    # if r is an executable type supported by Rubish, execute it.
+    if r.is_a?(Rubish::Command) ||
        r.is_a?(Rubish::Pipe)
       # is a bash command, so execute it.
       r.exec
