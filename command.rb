@@ -1,12 +1,8 @@
 
 class Rubish::Command
-  class BashError < RuntimeError
+  class CommandError < RuntimeError
   end
-
-  class SyntaxError < BashError
-  end
-
-  class BadStatus < BashError
+  class BadStatus < CommandError
     attr_reader :status
     def initialize(status)
       @status = status
