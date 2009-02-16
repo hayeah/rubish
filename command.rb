@@ -81,6 +81,7 @@ class Rubish::Command
 
   def each
     self.each_ do |l|
+      raise "wtf? 17??" if l == 17
       Rubish.session.submit(yield(l))
     end
   end
