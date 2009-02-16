@@ -9,7 +9,8 @@ class Rubish::Arguments
   end
   
   def to_s
-    @args.flatten.compact!.join " "
+    @args.flatten.compact!
+    @args.join " "
   end
   
   def [](key)
@@ -33,8 +34,19 @@ class Rubish::Arguments
     end
   end
 
+  def set(key,val=nil)
+    if self.has_key?(key)
+      self.delete(key)
+    end
+    self.toggle(key,val)
+  end
+
   def has_key?(key)
     keys.has_key?(key)
+  end
+
+  def push(key,val)
+    self.concat(key,[val])
   end
 
   def concat(key,array)
@@ -52,19 +64,53 @@ class Rubish::Arguments
       nil
     end
   end
+  
 
   def inspect
     "<#{self.class}: #{self.to_s}>"
   end
 end
 
-class Rubish::CommandAbstraction < Rubish::Command
-  attr_reader :a
+class Rubish::CommandBuilder < Rubish::Command
+  attr_reader :args
+  class << self
+    def inherited(klass)
+      puts "inherited by #{klass}"
+      klass.instance_eval do
+        def as(name)
+          self.instance_eval("def cmd_name; '#{name}'; end")
+        end
+      end
+    end
+  end
+  
   def initialize
-    @a = Rubish::Arguments.new
+    @args = Rubish::Arguments.new
   end
 
+  def set(key,val=nil)
+    args.set(key,val)
+    self
+  end
+
+  def toggle(key,val=nil)
+    args.toggle(key,val)
+    self
+  end
+  
+  def opts(v)
+    case v
+    when Array
+      args << v
+    when Hash
+      v.each do |k,v|
+        args.push(k,v)
+      end
+    end
+    self
+  end
+  
   def cmd
-    "#{a.to_s}"
+    "#{self.class.cmd_name} #{args.to_s}"
   end
 end

@@ -12,11 +12,13 @@ class Rubish::Pipe
   end
 
   def mu_handler(m,args,block)
+    # block's not actually used
+    raise "command builder doesn't take a block" unless block.nil?
     if m == :ruby
       raise "not supported yet"
       @cmds << [args,block]
     else
-      @cmds << Rubish::Command.new(m,args,block)
+      @cmds << Rubish::Command::ShellCommand.new(m,args)
     end
   end
 

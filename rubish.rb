@@ -49,6 +49,7 @@ class Rubish::Mu
       puts "block: #{block}"
     end
   end
+  
 end
 
 load 'command.rb'

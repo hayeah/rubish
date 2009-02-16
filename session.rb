@@ -20,7 +20,7 @@ class Rubish::Session
     # block's not actually used
     raise "command builder doesn't take a block" unless block.nil?
     m = m.to_s
-    Rubish::Command.new(m,args)
+    Rubish::Command::ShellCommand.new(m,args)
   end
 
   def repl

@@ -2,6 +2,7 @@
 class Rubish::Command
   class CommandError < RuntimeError
   end
+
   class BadStatus < CommandError
     attr_reader :status
     def initialize(status)
@@ -13,34 +14,28 @@ class Rubish::Command
     end
   end
 
-  class << self
-    def build(cmd,args)
-      self.new(cmd,args)
+  class ShellCommand < Rubish::Command
+    attr_reader :cmd, :opts
+    def initialize(cmd,args)
+      @status = nil
+      @args = args.join " "
+      @cmd = "#{cmd} #{args}"
     end
   end
-  # sh = Bash.new(cmd,*args)
-  # sh.exec
-  #
-  # for piping
-  # sh.out = <io>
-  # sh.in = <io>
-  attr_reader :exe, :args, :status
-  attr_reader :cmd, :opts
+
+  attr_reader :status
   attr_reader :input, :output
-  def initialize(cmd,args)
-    @exe = cmd
-    @status = nil
-    @args = args.join " "
-    @cmd = "#{exe} #{args}"
+
+  def initialize
+    raise "abstract"
   end
 
   def exec
     pid = self.exec_
 
-    _pid, status = Process.waitpid2(pid) # sync
-
-    if status != 0
-      raise BadStatus.new(status)
+    _pid, @status = Process.waitpid2(pid) # sync
+    if @status != 0
+      raise BadStatus.new(@status)
     end
     return nil
   end
@@ -76,9 +71,9 @@ class Rubish::Command
       r.each_line do |l|
         yield(l)
       end
-      _pid, status = Process.waitpid2(pid)
-      if status != 0
-        raise BadStatus.new(status)
+      _pid, @status = Process.waitpid2(pid)
+      if @status != 0
+        raise BadStatus.new(@status)
       end
     end
     return nil
