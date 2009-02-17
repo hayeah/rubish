@@ -18,8 +18,8 @@ class Rubish::Command < Rubish::Executable
     attr_reader :cmd, :opts
     def initialize(cmd,args)
       @status = nil
-      @args = args.join " "
-      @cmd = "#{cmd} #{args}"
+      @args = parse_args(args)
+      @cmd = "#{cmd} #{@args}"
     end
   end
 
@@ -126,6 +126,25 @@ class Rubish::Command < Rubish::Executable
     @input = i
     @output = o
     self
+  end
+
+  private
+
+  def parse_args(args)
+    rs = args.map do |arg|
+      case arg
+      when Symbol
+        "-#{arg.to_s[0..-1]}"
+      when Array
+        # recursively flatten args
+        parse_args(arg)
+      when String
+        arg
+      else
+        raise "argument to command should be one of Symbol, String, Array "
+      end
+    end
+    rs.join " "
   end
 
 end
