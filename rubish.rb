@@ -12,6 +12,13 @@ module Rubish
   end
 end
 
+# abstract class all executable rubish objects descend from
+class Rubish::Executable
+  def exec
+    raise "abstract"
+  end
+end
+
 # This is an object that doesn't respond to anything.
 #
 # This provides an empty context for instance_eval (__instance_eval
@@ -55,4 +62,5 @@ end
 load 'command.rb'
 load 'command_builder.rb'
 load 'pipe.rb'
+load 'awk.rb'
 load 'session.rb'

@@ -1,5 +1,5 @@
 
-class Rubish::Command
+class Rubish::Command < Rubish::Executable
   class CommandError < RuntimeError
   end
 
@@ -57,21 +57,36 @@ class Rubish::Command
     return pid
   end
 
+  def awk
+    Rubish::Awk.new(self)
+  end
+
+  # TODO HMMM.. sometimes for reasons unknown this
+  # method prints "17" (SIGCHLD). I can't figure
+  # out why or where.
+  ## I think it's ruby's default signal handler
+  ## doing something funny?
   def each_
     # send output lines to block if command is not already redirected
     if output.nil?
       r,w = IO.pipe
       @output = w
       pid = self.exec_
-      w.close
-      old_trap = Signal.trap("CHLD") do
-        r.close
+      w.close # this is the write end of the forked child
+
+#       Signal.trap("CHLD") do
+#         puts "child closed"
+#       end
+      
+      begin
+        r.each_line do |l|
+          yield(l)
+        end
+      ensure
+        # in case the block was broken out of.
+        #Signal.trap("CHLD","DEFAULT")
+        _pid, @status = Process.waitpid2(pid)
       end
-      Signal.trap("CHLD",&old_trap)
-      r.each_line do |l|
-        yield(l)
-      end
-      _pid, @status = Process.waitpid2(pid)
       if @status != 0
         raise BadStatus.new(@status)
       end
@@ -81,7 +96,6 @@ class Rubish::Command
 
   def each
     self.each_ do |l|
-      raise "wtf? 17??" if l == 17
       Rubish.session.submit(yield(l))
     end
   end
@@ -89,7 +103,7 @@ class Rubish::Command
   def map
     acc = []
     self.each_ do |l|
-      acc << yield(l)
+      acc << (block_given? ? yield(l) : l )
     end
     acc
   end

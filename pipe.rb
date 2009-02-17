@@ -1,5 +1,5 @@
 
-class Rubish::Pipe
+class Rubish::Pipe < Rubish::Executable
   attr_reader :cmds
   def initialize(&block)
     @cmds = []

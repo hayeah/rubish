@@ -54,15 +54,13 @@ class Rubish::Session
     ## this special case is nauseating, but it fits the Unix cmd line
     ## processing model better, where non matched lines (nil) are just
     ## swallowed.
-    return if r.nil?
-    # if r is an executable type supported by Rubish, execute it.
-    if r.is_a?(Rubish::Command) ||
-       r.is_a?(Rubish::Pipe)
-      # is a bash command, so execute it.
+    case r
+    when Rubish::Executable
       r.exec
-    elsif r
-      # normal ruby value
+    when r
       pp r
+    else
+      # do nothing
     end
   end
 
