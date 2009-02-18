@@ -32,19 +32,19 @@ class Rubish::Executable
   end
 
   # methods for io redirection
-  
+
   def i(i)
-    @io_in = i
+    @io_in =  __get_io i
     self
   end
 
   def o(o)
-    @io_out = o
+    @io_out =  __get_io o
     self
   end
 
   def err(e)
-    @io_err = e
+    @io_err =  __get_io e
     self
   end
   
@@ -52,6 +52,24 @@ class Rubish::Executable
     i(i); o(o)
     self
   end
+
+  private
+  def __get_io(val)
+    case val
+      
+#     when String
+#       raise "not a file" unless File.file?(File.expand_path(val))
+#       File.new(val,"r")
+      
+    when Integer
+      IO.new(val)
+    when IO
+      val
+    else
+      raise "not a valid input: #{val}"
+    end
+  end
+  
 
 end
 

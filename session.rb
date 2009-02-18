@@ -9,6 +9,10 @@ class Rubish::Session
     def p(&block)
       Rubish::Pipe.new &block
     end
+
+    def awk
+      Rubish::Awk.new
+    end
   end
 
   def initialize
