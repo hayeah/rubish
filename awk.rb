@@ -2,12 +2,19 @@
 # produce ruby values
 class Rubish::Awk < Rubish::Evaluable
   
-  # internal
-  
-#   attr_reader :beg_act
-#   attr_reader :acts
-#   attr_reader :end_act
-
+  class << self
+    def make(exe,fs=nil,&block)
+      a = Rubish::Awk.new(exe)
+      if fs
+        a.fs(fs)
+      end
+      if block
+        a.act(&block)
+      end
+      a
+    end
+  end
+    
   attr_reader :a # array of fields
   attr_reader :r # string of current record
   attr_reader :nr # number of records so far

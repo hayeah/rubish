@@ -57,14 +57,7 @@ class Rubish::Command < Rubish::Executable
   end
 
   def awk(fs=nil,&block)
-    a = Rubish::Awk.new(self)
-    if fs
-      a.fs(fs)
-    end
-    if block
-      a.act(&block)
-    end
-    a
+    Rubish::Awk.make(self,fs,&block)
   end
 
   # TODO HMMM.. sometimes for reasons unknown this
