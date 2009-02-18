@@ -82,6 +82,7 @@ class Rubish::Command < Rubish::Executable
     ensure
       # in case the block was broken out of.
       #Signal.trap("CHLD","DEFAULT")
+      r.close
       _pid, @status = Process.waitpid2(pid)
     end
     if @status != 0
@@ -91,9 +92,6 @@ class Rubish::Command < Rubish::Executable
     return nil
   end
 
-  # take care of nested commands
-  ## a nested command only inherits the output and error IO objects.
-  ## cmd1.each {|l| cmd2(l) }
   def each
     self.each_ do |l|
       Rubish.session.submit(yield(l))

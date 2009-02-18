@@ -23,11 +23,12 @@ class Rubish::Pipe < Rubish::Executable
     end
   end
 
-  def exec
+  def exec_
     # pipes == [i0,o1,i1,o2,i2...in,o0]
     # i0 == $stdin
     # o0 == $stdout
     pipe = nil # [r, w]
+    pids = []
     @cmds.each_index do |index|
       if index == 0 # head
         i = io_in
@@ -45,6 +46,7 @@ class Rubish::Pipe < Rubish::Executable
       cmd = @cmds[index]
       if child = fork # children
         #parent
+        pids << child
         i.close unless i == io_in
         o.close unless o == io_out
       else
@@ -53,8 +55,41 @@ class Rubish::Pipe < Rubish::Executable
         Kernel.exec cmd.cmd
       end
     end
-    
-    ps = Process.waitall
-    #pp ps
+    return pids
   end
+
+  def exec
+    self.exec_
+    ps = Process.waitall
+  end
+
+  def each_
+    r,w = IO.pipe
+    begin
+      self.o(w)
+      self.exec_
+      w.close
+      r.each_line do |l|
+        yield(l)
+      end
+    ensure
+      r.close
+    end
+    return nil
+  end
+
+  def each
+    self.each_ do |l|
+      Rubish.session.submit(yield(l))
+    end
+  end
+
+  def map
+    acc = []
+    self.each_ do |l|
+      acc << (block_given? ? yield(l) : l )
+    end
+    acc
+  end
+  
 end
