@@ -54,10 +54,9 @@ class Rubish::Session
     ## this special case is nauseating, but it fits the Unix cmd line
     ## processing model better, where non matched lines (nil) are just
     ## swallowed.
-    case r
-    when Rubish::Executable
+    if r.is_a?(Rubish::Executable)
       r.exec
-    when r
+    elsif r
       pp r
     else
       # do nothing

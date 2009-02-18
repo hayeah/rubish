@@ -14,9 +14,42 @@ end
 
 # abstract class all executable rubish objects descend from
 class Rubish::Executable
+  attr_reader :io_in
+  attr_reader :io_out
+  attr_reader :io_err
+
+  def initialize
+    @io_in = $stdin
+    @io_out = $stdout
+    @io_err = $stderr
+  end
+  
   def exec
     raise "abstract"
   end
+
+  # methods for io redirection
+  
+  def i(i)
+    @io_in = i
+    self
+  end
+
+  def o(o)
+    @io_out = o
+    self
+  end
+
+  def err(e)
+    @io_err = e
+    self
+  end
+  
+  def io(i=nil,o=nil)
+    i(i); o(o)
+    self
+  end
+
 end
 
 # This is an object that doesn't respond to anything.

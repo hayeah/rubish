@@ -17,6 +17,7 @@ class Rubish::Command < Rubish::Executable
   class ShellCommand < Rubish::Command
     attr_reader :cmd, :opts
     def initialize(cmd,args)
+      super()
       @status = nil
       @args = parse_args(args)
       @cmd = "#{cmd} #{@args}"
@@ -26,12 +27,8 @@ class Rubish::Command < Rubish::Executable
   attr_reader :status
   attr_reader :input, :output
 
-  def initialize
-    raise "abstract"
-  end
-
   def exec
-    pid = self.exec_
+    pid = self.exec_(io_in,io_out,io_err)
 
     _pid, @status = Process.waitpid2(pid) # sync
     if @status != 0
@@ -40,12 +37,14 @@ class Rubish::Command < Rubish::Executable
     return nil
   end
 
-  def exec_
+  def exec_(i,o,e)
     unless pid = Kernel.fork
       # child
       begin
-        $stdin.reopen(input) if input
-        $stdout.reopen(output) if output
+        $stdin.reopen(i)
+        $stdout.reopen(o)
+        $stderr.reopen(e)
+        # exec the command
         Kernel.exec(self.cmd)
       rescue
         puts $!
@@ -58,7 +57,9 @@ class Rubish::Command < Rubish::Executable
   end
 
   def awk
-    Rubish::Awk.new(self)
+    r,w = IO.pipe
+    self.o(w)
+    Rubish::Awk.new(r)
   end
 
   # TODO HMMM.. sometimes for reasons unknown this
@@ -67,36 +68,43 @@ class Rubish::Command < Rubish::Executable
   ## I think it's ruby's default signal handler
   ## doing something funny?
   def each_
-    # send output lines to block if command is not already redirected
-    if output.nil?
-      r,w = IO.pipe
-      @output = w
-      pid = self.exec_
-      w.close # this is the write end of the forked child
+    r,w = IO.pipe
+    pid = self.exec_(io_in,w,w)
+    w.close # this is the write end of the forked child
 
-#       Signal.trap("CHLD") do
-#         puts "child closed"
-#       end
-      
-      begin
-        r.each_line do |l|
-          yield(l)
-        end
-      ensure
-        # in case the block was broken out of.
-        #Signal.trap("CHLD","DEFAULT")
-        _pid, @status = Process.waitpid2(pid)
+    #       Signal.trap("CHLD") do
+    #         puts "child closed"
+    #       end
+    begin
+      r.each_line do |l|
+        yield(l)
       end
-      if @status != 0
-        raise BadStatus.new(@status)
-      end
+    ensure
+      # in case the block was broken out of.
+      #Signal.trap("CHLD","DEFAULT")
+      _pid, @status = Process.waitpid2(pid)
     end
+    if @status != 0
+      raise BadStatus.new(@status)
+    end
+    
     return nil
   end
 
+  # take care of nested commands
+  ## a nested command only inherits the output and error IO objects.
+  ## cmd1.each {|l| cmd2(l) }
   def each
     self.each_ do |l|
-      Rubish.session.submit(yield(l))
+      r = yield(l)
+      if r.is_a?(Rubish::Executable)
+        r.o(self.io_out)
+        r.err(self.io_err)
+        r.exec
+        # no output if it's a nested command
+      else
+        Rubish.session.submit(r)
+      end
     end
   end
 
@@ -111,23 +119,7 @@ class Rubish::Command < Rubish::Executable
   def to_s
     self.cmd
   end
-
-  def i(i)
-    @input = i
-    self
-  end
-
-  def o(o)
-    @output = o
-    self
-  end
   
-  def io(i=nil,o=nil)
-    @input = i
-    @output = o
-    self
-  end
-
   private
 
   def parse_args(args)
