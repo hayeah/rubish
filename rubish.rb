@@ -18,7 +18,10 @@ class Rubish::Executable
   attr_reader :io_out
   attr_reader :io_err
 
-  def initialize
+  def initialize(*args)
+    # ignore the args. This is so children classes
+    # can call "super" even if their initializers
+    # take arguments.
     @io_in = $stdin
     @io_out = $stdout
     @io_err = $stderr

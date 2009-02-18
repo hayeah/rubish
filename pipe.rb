@@ -2,6 +2,7 @@
 class Rubish::Pipe < Rubish::Executable
   attr_reader :cmds
   def initialize(&block)
+    super
     @cmds = []
     if block
       mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
@@ -26,15 +27,15 @@ class Rubish::Pipe < Rubish::Executable
     # pipes == [i0,o1,i1,o2,i2...in,o0]
     # i0 == $stdin
     # o0 == $stdout
-    pipe = nil # r, w
+    pipe = nil # [r, w]
     @cmds.each_index do |index|
       if index == 0 # head
-        i = $stdin
+        i = io_in
         pipe = IO.pipe
         o = pipe[1] # w
       elsif index == (@cmds.length - 1) # tail
         i = pipe[0]
-        o = $stdout
+        o = io_out
       else # middle
         i = pipe[0] # r
         pipe = IO.pipe
@@ -44,8 +45,8 @@ class Rubish::Pipe < Rubish::Executable
       cmd = @cmds[index]
       if child = fork # children
         #parent
-        i.close unless i == $stdin
-        o.close unless o == $stdout
+        i.close unless i == io_in
+        o.close unless o == io_out
       else
         $stdin.reopen(i)
         $stdout.reopen(o)

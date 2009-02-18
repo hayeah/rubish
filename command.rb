@@ -17,7 +17,7 @@ class Rubish::Command < Rubish::Executable
   class ShellCommand < Rubish::Command
     attr_reader :cmd, :opts
     def initialize(cmd,args)
-      super()
+      super
       @status = nil
       @args = parse_args(args)
       @cmd = "#{cmd} #{@args}"
