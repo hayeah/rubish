@@ -96,15 +96,7 @@ class Rubish::Command < Rubish::Executable
   ## cmd1.each {|l| cmd2(l) }
   def each
     self.each_ do |l|
-      r = yield(l)
-      if r.is_a?(Rubish::Executable)
-        r.o(self.io_out)
-        r.err(self.io_err)
-        r.exec
-        # no output if it's a nested command
-      else
-        Rubish.session.submit(r)
-      end
+      Rubish.session.submit(yield(l))
     end
   end
 
