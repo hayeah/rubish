@@ -56,10 +56,15 @@ class Rubish::Command < Rubish::Executable
     return pid
   end
 
-  def awk
-    r,w = IO.pipe
-    self.o(w)
-    Rubish::Awk.new(r)
+  def awk(fs=nil,&block)
+    a = Rubish::Awk.new(self)
+    if fs
+      a.fs(fs)
+    end
+    if block
+      a.act(&block)
+    end
+    a
   end
 
   # TODO HMMM.. sometimes for reasons unknown this

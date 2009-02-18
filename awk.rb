@@ -1,6 +1,6 @@
-# awkish extension to Rubish::Command
-
-class Rubish::Awk < Rubish::Executable
+# awkish wrapper to Rubish::Executable types to
+# produce ruby values
+class Rubish::Awk < Rubish::Evaluable
   
   # internal
   
@@ -12,15 +12,18 @@ class Rubish::Awk < Rubish::Executable
   attr_reader :r # string of current record
   attr_reader :nr # number of records so far
   attr_reader :nf # number of fields for current record
+  attr_reader :buckets, :bucket_types
   
-  def initialize(cmd)
-    @cmd = cmd
+  def initialize(exe)
+    @exe = exe
     @fs = /\s+/
     @nr = 0 # number of records matched
     @nf = 0 # number of fields for a record
     @acts = []
     @beg_act  = nil
     @end_act = nil
+    @buckets = {}
+    @bucket_types = {}
   end
   
   def rs=(*args)
@@ -28,32 +31,28 @@ class Rubish::Awk < Rubish::Executable
     self
   end
 
-  def fs=(fs)
+  def fs(fs)
     @fs = fs
     self
   end
   
-  def exec
+  def eval
     self.instance_eval(&@beg_act) if @beg_act
-    @cmd.each_ do |record|
+    @exe.each_ do |record|
       @nr += 1
       @a = record.split(@fs)
       @nf = @a.length
       @r = record
-      
-      awk = self
-      @acts.each do |action|
-        # let action be able to access the instance variables in awk
-        awk.instance_eval(&action)
-      end
-    end
-    
-    return self.instance_eval(&@end_act)  if @end_act
-  end
 
-  # an action that returns nil is a null action
+      self.instance_eval(&@act)
+    end
+
+    return self.instance_eval(&@end_act) if @end_act
+  end
+  
+  # one clause is enough
   def act(&block)
-    @acts << block
+    @act = block
     self
   end
 
@@ -68,42 +67,98 @@ class Rubish::Awk < Rubish::Executable
   end
 
   # common-lisp loopesque helpers
-  def count(bucket_name,&pattern_block)
-    ivar = "@#{bucket_name}"
-    create_bucket(bucket_name,0)
-    self.act do
-      if self.instance_eval(&pattern_block)
-        count = self.instance_variable_get(ivar)
-        self.instance_variable_set(ivar,count+1)
-      end
+  def count(name,key=nil)
+    create_bucket(:count,name,0)
+    update_bucket(name,[key,nil]) do |old_c,ignore|
+      old_c + 1
     end
-    self
   end
 
-  def collect(bucket_name,&pattern_block)
-    ivar = "@#{bucket_name}"
-    create_bucket(bucket_name,[])
-    self.act do
-      if val = self.instance_eval(&pattern_block)
-        vals = self.instance_variable_get(ivar)
-        vals << val
-        self.instance_variable_set(ivar,vals)
+  def pick(name,*args)
+    create_bucket(:pick,name,nil)
+    update_bucket(name,args) do |old_v,new_v|
+      if old_v.nil?
+        new_v
+      else
+        yield(old_v,new_v)
       end
     end
-    self
+  end
+  
+  def max(name,*args)
+    create_bucket(:max,name,nil)
+    update_bucket(name,args) do |old,new|
+      if old.nil?
+        new
+      elsif new > old
+        new
+      else
+        old
+      end
+    end
+  end
+
+  def min(name,*args)
+    create_bucket(:min,name,nil)
+    update_bucket(name,args) do |old,new|
+      if old.nil?
+        new
+      elsif new < old
+        new
+      else
+        old
+      end
+    end
+  end
+
+  def collect(name,*args)
+    create_bucket(:collect,name,nil)
+    update_bucket(name,args) do |acc,val|
+      if acc.nil?
+        acc = [val]
+      else
+        acc << val
+      end
+    end
   end
 
   private
 
-  def create_bucket(bucket_name,val)
-    ivar = "@#{bucket_name}"
-    raise "ivar name already in use: #{bucket_name}" if self.instance_variable_defined?(ivar)
-    self.instance_variable_set(ivar,val)
-    # attr_reader
-    singleton = class << self; self; end
-    singleton.send(:define_method,bucket_name) do
-      self.instance_variable_get(ivar)
+  # [type] denotes an aggregate of type
+  # type denotes the type itself (non-aggregate)
+  def create_bucket(type,name,init_val)
+    name = name.to_s
+    if buckets.has_key?(name)
+      raise "conflict bucket types for: #{name}" unless bucket_types[name] == type
+      return false
+    else
+      raise "bucket name conflicts with existing method: #{name}" if self.respond_to?(name)
+      bucket_types[name] = type
+      buckets[name] = Hash.new(init_val)
+      #singleton = class << self; self; end
+
+      defstr = <<-HERE
+def #{name}(key=nil)
+  buckets["#{name}"][key]
+end
+HERE
+      self.instance_eval(defstr)
+
+
     end
+    return true
+  end
+  
+  def update_bucket(name,args)
+    name = name.to_s
+    if args.length == 1
+      key = nil
+      val = args.first
+    elsif args.length == 2
+      key, val = args
+    end
+    new_val = yield(buckets[name][key],val)
+    buckets[name][key] = new_val
   end
   
 end

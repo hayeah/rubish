@@ -60,6 +60,9 @@ class Rubish::Session
     ## swallowed.
     if r.is_a?(Rubish::Executable)
       r.exec
+      # hmmm... should it do anything with the return value of r.exec?
+    elsif r.is_a?(Rubish::Evaluable)
+      submit(r.eval)
     elsif r
       pp r
     else

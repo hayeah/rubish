@@ -13,6 +13,14 @@ module Rubish
 end
 
 # abstract class all executable rubish objects descend from
+# executable objects read and write from IO
+## they usually don't return anything, but they
+## would have methods defined to make their io
+## streams available to ruby to process (i.e. Rubish::Command#each)
+#
+# Rubish::Command < Rubish::Executable
+# Rubish::CommandBuilder < Rubish::Command
+# Rubish::Pipe < Rubish::Executable
 class Rubish::Executable
   attr_reader :io_in
   attr_reader :io_out
@@ -71,6 +79,14 @@ class Rubish::Executable
   end
   
 
+end
+
+# objects that rubish shell tries to eval to return an ruby value.
+# Rubish::Awk < Rubish::Evaluable
+class Rubish::Evaluable
+  def eval
+    raise "abstract"
+  end
 end
 
 # This is an object that doesn't respond to anything.
