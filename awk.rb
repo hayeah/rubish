@@ -81,9 +81,9 @@ class Rubish::Awk < Rubish::Evaluable
     end
   end
 
-  def pick(name,*args)
+  def pick(name,val,key=nil)
     create_bucket(:pick,name,nil)
-    update_bucket(name,args) do |old_v,new_v|
+    update_bucket(name,val,key) do |old_v,new_v|
       if old_v.nil?
         new_v
       else
@@ -92,9 +92,9 @@ class Rubish::Awk < Rubish::Evaluable
     end
   end
   
-  def max(name,*args)
+  def max(name,val,key=nil)
     create_bucket(:max,name,nil)
-    update_bucket(name,args) do |old,new|
+    update_bucket(name,val,key) do |old,new|
       if old.nil?
         new
       elsif new > old
@@ -105,9 +105,9 @@ class Rubish::Awk < Rubish::Evaluable
     end
   end
 
-  def min(name,*args)
+  def min(name,val,key=nil)
     create_bucket(:min,name,nil)
-    update_bucket(name,args) do |old,new|
+    update_bucket(name,val,key) do |old,new|
       if old.nil?
         new
       elsif new < old
@@ -118,9 +118,9 @@ class Rubish::Awk < Rubish::Evaluable
     end
   end
 
-  def collect(name,*args)
+  def collect(name,val,key=nil)
     create_bucket(:collect,name,nil)
-    update_bucket(name,args) do |acc,val|
+    update_bucket(name,val,key) do |acc,val|
       if acc.nil?
         acc = [val]
       else
@@ -156,16 +156,16 @@ HERE
     return true
   end
   
-  def update_bucket(name,args)
+  def update_bucket(name,val,key=nil)
     name = name.to_s
-    if args.length == 1
-      key = nil
-      val = args.first
-    elsif args.length == 2
-      key, val = args
+    # if a key is given, update the key specific sub-bucket.
+    if key
+      new_val = yield(buckets[name][key],val)
+      buckets[name][key] = new_val
     end
-    new_val = yield(buckets[name][key],val)
-    buckets[name][key] = new_val
+    # always update the special nil key.
+    new_val = yield(buckets[name][nil],val)
+    buckets[name][nil] = new_val
   end
   
 end
