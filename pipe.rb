@@ -2,7 +2,6 @@
 class Rubish::Pipe < Rubish::Executable
   attr_reader :cmds
   def initialize(&block)
-    super
     @cmds = []
     if block
       mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
@@ -19,24 +18,33 @@ class Rubish::Pipe < Rubish::Executable
       raise "not supported yet"
       @cmds << [args,block]
     else
-      @cmds << Rubish::Command::ShellCommand.new(m,args)
+      cmd = Rubish::Command::ShellCommand.new(m,args)
+      @cmds << cmd
+      return cmd
     end
   end
 
-  def exec_
+  def exec_with(pipe_in,pipe_out,pipe_err)
+    @cmds.each do |cmd|
+      if cmd.i || cmd.o || cmd.err
+        raise "It's weird to redirect stdioe for command in a pipeline. Don't."
+      end
+    end
     # pipes == [i0,o1,i1,o2,i2...in,o0]
     # i0 == $stdin
     # o0 == $stdout
     pipe = nil # [r, w]
     pids = []
     @cmds.each_index do |index|
-      if index == 0 # head
-        i = io_in
+      tail = index == (@cmds.length - 1) # tail
+      head = index == 0 # head
+      if head
+        i = pipe_in
         pipe = IO.pipe
         o = pipe[1] # w
-      elsif index == (@cmds.length - 1) # tail
+      elsif tail
         i = pipe[0]
-        o = io_out
+        o = pipe_out
       else # middle
         i = pipe[0] # r
         pipe = IO.pipe
@@ -47,49 +55,18 @@ class Rubish::Pipe < Rubish::Executable
       if child = fork # children
         #parent
         pids << child
-        i.close unless i == io_in
-        o.close unless o == io_out
+        # it's important to close the pipes held
+        # by spawning parent, otherwise the pipes
+        # would not close after a program ends.
+        i.close unless head
+        o.close unless tail
       else
-        $stdin.reopen(i)
-        $stdout.reopen(o)
+        # Rubish.set_stdioe((cmd.i || i),(cmd.o || o),(cmd.err || pipe_err))
+        Rubish.set_stdioe(i,o,pipe_err)
         Kernel.exec cmd.cmd
       end
     end
     return pids
-  end
-
-  def exec
-    self.exec_
-    ps = Process.waitall
-  end
-
-  def each_
-    r,w = IO.pipe
-    begin
-      self.o(w)
-      self.exec_
-      w.close
-      r.each_line do |l|
-        yield(l)
-      end
-    ensure
-      r.close
-    end
-    return nil
-  end
-
-  def each
-    self.each_ do |l|
-      Rubish.session.submit(yield(l))
-    end
-  end
-
-  def map
-    acc = []
-    self.each_ do |l|
-      acc << (block_given? ? yield(l) : l )
-    end
-    acc
   end
   
 end

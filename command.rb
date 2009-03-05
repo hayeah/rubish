@@ -17,7 +17,6 @@ class Rubish::Command < Rubish::Executable
   class ShellCommand < Rubish::Command
     attr_reader :cmd, :opts
     def initialize(cmd,args)
-      super
       @status = nil
       @args = parse_args(args)
       @cmd = "#{cmd} #{@args}"
@@ -27,23 +26,23 @@ class Rubish::Command < Rubish::Executable
   attr_reader :status
   attr_reader :input, :output
 
-  def exec
-    pid = self.exec_(io_in,io_out,io_err)
+#   def exec
+#     pid = self.exec_(io_in,io_out,io_err)
 
-    _pid, @status = Process.waitpid2(pid) # sync
-    if @status != 0
-      raise BadStatus.new(@status)
-    end
-    return nil
-  end
+#     _pid, @status = Process.waitpid2(pid) # sync
+#     if @status != 0
+#       raise BadStatus.new(@status)
+#     end
+#     return nil
+#   end
 
-  def exec_(i,o,e)
+  def exec_with(i,o,e)
     unless pid = Kernel.fork
       # child
       begin
-        $stdin.reopen(i)
-        $stdout.reopen(o)
-        $stderr.reopen(e)
+        # dup2 the given i,o,e to stdin,stdout,stderr
+        # close all other file 
+        Rubish.set_stdioe(i,o,e)
         # exec the command
         Kernel.exec(self.cmd)
       rescue
@@ -58,50 +57,6 @@ class Rubish::Command < Rubish::Executable
 
   def awk(fs=nil,&block)
     Rubish::Awk.make(self,fs,&block)
-  end
-
-  # TODO HMMM.. sometimes for reasons unknown this
-  # method prints "17" (SIGCHLD). I can't figure
-  # out why or where.
-  ## I think it's ruby's default signal handler
-  ## doing something funny?
-  def each_
-    r,w = IO.pipe
-    pid = self.exec_(io_in,w,w)
-    w.close # this is the write end of the forked child
-
-    #       Signal.trap("CHLD") do
-    #         puts "child closed"
-    #       end
-    begin
-      r.each_line do |l|
-        yield(l)
-      end
-    ensure
-      # in case the block was broken out of.
-      #Signal.trap("CHLD","DEFAULT")
-      r.close
-      _pid, @status = Process.waitpid2(pid)
-    end
-    if @status != 0
-      raise BadStatus.new(@status)
-    end
-    
-    return nil
-  end
-
-  def each
-    self.each_ do |l|
-      Rubish.session.submit(yield(l))
-    end
-  end
-
-  def map
-    acc = []
-    self.each_ do |l|
-      acc << (block_given? ? yield(l) : l )
-    end
-    acc
   end
 
   def to_s
