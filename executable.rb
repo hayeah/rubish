@@ -71,7 +71,7 @@ class Rubish::Executable
     self
   end
 
-  def each_
+  def each
     begin
       old_o = self.o
       r,w = IO.pipe
@@ -84,12 +84,6 @@ class Rubish::Executable
     ensure
       self.o(old_o)
       w.close if !w.closed?
-    end
-  end
-
-  def each
-    self.each_ do |l|
-      Rubish.session.submit(l)
     end
   end
 
