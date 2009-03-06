@@ -1,7 +1,6 @@
 
 require 'pp'
 require 'fileutils'
-require 'fcntl'
 
 module Rubish
   class << self
@@ -193,7 +192,7 @@ class Rubish::Executable
       end
       return return_io, true, thread
     else
-      raise "not a valid input: #{val}"
+      raise "not a valid input: #{io}"
     end
   end
   
