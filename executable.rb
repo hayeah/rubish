@@ -1,5 +1,9 @@
 class Rubish::Executable
 
+  def awk(fs=nil,&block)
+    Rubish::Awk.make(self,fs,&block)
+  end
+
   class AbnormalExits < RuntimeError
     attr_reader :statuses
     def initialize(statuses)

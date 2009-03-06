@@ -45,7 +45,7 @@ class Rubish::Awk < Rubish::Evaluable
   
   def eval
     self.instance_eval(&@beg_act) if @beg_act
-    @exe.each_ do |record|
+    @exe.each do |record|
       @nr += 1
       @a = record.split(@fs)
       @nf = @a.length

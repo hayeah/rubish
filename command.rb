@@ -30,10 +30,6 @@ class Rubish::Command < Rubish::Executable
     return pid
   end
 
-  def awk(fs=nil,&block)
-    Rubish::Awk.make(self,fs,&block)
-  end
-
   def to_s
     self.cmd
   end
