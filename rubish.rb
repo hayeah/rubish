@@ -36,6 +36,18 @@ end
 # Rubish::Pipe < Rubish::Executable
 class Rubish::Executable
   
+  class AbnormalExits < RuntimeError
+    attr_reader :statuses
+    def initialize(statuses)
+      @statuses = statuses
+    end
+
+    def to_s
+      report = statuses.map { |s| "#{s.pid} => #{s.exitstatus}"}.join ";"
+      "<##{self.class}: #{report}>"
+    end
+  end
+  
   # an io could be
   # String: interpreted as file name
   # Number: file descriptor
@@ -49,7 +61,13 @@ class Rubish::Executable
       e, close_e, thread_e = __prepare_io(e,"w")
       # exec_with forks processes that communicate with Rubish via IPCs
       exec_with((i || $stdin), (o || $stdout), (e || $stderr))
-      Process.waitall
+      statuses = Process.waitall.map { |r| r[1] }
+      bads = statuses.select do |s|
+        s if s.to_i != 0 
+      end
+      if !bads.empty?
+        raise AbnormalExits.new(bads)
+      end
     ensure
       # i,o,e could've already been closed by an IO thread (when a block is used).
       i.close if close_i && !i.closed?
@@ -99,15 +117,6 @@ class Rubish::Executable
       r.each_line do |l|
         yield(l)
       end
-      # or we could do the following:
-      ## except it spawns a thread per iteration if we have nested calls.
-      # e.g. cmd.each_ {|l| cmd2(l).map }
-#       self.o do |p|
-#         p.each_line do |l|
-#           yield(l)
-#         end
-#       end
-
     ensure
       self.o(old_o)
       w.close if !w.closed?

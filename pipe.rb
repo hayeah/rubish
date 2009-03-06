@@ -62,8 +62,13 @@ class Rubish::Pipe < Rubish::Executable
         o.close unless tail
       else
         # Rubish.set_stdioe((cmd.i || i),(cmd.o || o),(cmd.err || pipe_err))
-        Rubish.set_stdioe(i,o,pipe_err)
-        Kernel.exec cmd.cmd
+        begin
+          Rubish.set_stdioe(i,o,pipe_err)
+          Kernel.exec cmd.cmd
+        rescue
+          puts $!
+          Kernel.exit(1)
+        end
       end
     end
     return pids
