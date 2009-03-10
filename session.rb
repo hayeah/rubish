@@ -63,10 +63,8 @@ class Rubish::Session
       # hmmm... should it do anything with the return value of r.exec?
     elsif r.is_a?(Rubish::Evaluable)
       submit(r.eval)
-    elsif r
+    else r
       pp r
-    else
-      # do nothing
     end
   end
 
