@@ -30,19 +30,19 @@ class Rubish::Session
   def repl
     # don't ever try to do anything with mu except Mu#__instance_eval
     raise "$stdin is not a tty device" unless $stdin.tty?
-    mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
-    mu.__extend Rubish::Session::Base
+    __mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
+    __mu.__extend Rubish::Session::Base
     begin
       attach_session
       loop do
-        line = read
-        if line
+        __line = read
+        if __line
           begin
-            r = mu.__instance_eval(line)
-            self.submit(r)
-          rescue StandardError, ScriptError => e
-            puts e
-            puts e.backtrace
+            __r = __mu.__instance_eval(__line)
+            self.submit(__r)
+          rescue StandardError, ScriptError => __e
+            puts __e
+            puts __e.backtrace
           end
         else
           next
