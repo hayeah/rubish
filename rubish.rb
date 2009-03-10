@@ -25,6 +25,13 @@ module Rubish
   end
 end
 
+class IO
+  def pp(obj)
+    PP.pp(obj,self)
+    return nil
+  end
+end
+
 # abstract class all executable rubish objects descend from
 # executable objects read and write from IO
 ## they usually don't return anything, but they
