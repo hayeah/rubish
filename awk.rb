@@ -1,6 +1,7 @@
 # awkish wrapper to Rubish::Executable types to
 # produce ruby values
 class Rubish::Awk < Rubish::Evaluable
+  include Rubish::Streamer
   
   class << self
     def make(exe,fs=nil,&block)
@@ -17,14 +18,13 @@ class Rubish::Awk < Rubish::Evaluable
     
   attr_reader :a # array of fields
   attr_reader :r # string of current record
-  attr_reader :nr # number of records so far
   attr_reader :nf # number of fields for current record
   attr_reader :buckets, :bucket_types
   
   def initialize(exe)
+    init_streamer
     @exe = exe
     @fs = /\s+/
-    @nr = 0 # number of records matched
     @nf = 0 # number of fields for a record
     @acts = []
     @beg_act  = nil
@@ -42,27 +42,33 @@ class Rubish::Awk < Rubish::Evaluable
     @fs = fs
     self
   end
-  
-  def eval
+
+  def nr
+    lineno
+  end
+
+  def stream_begin
     self.instance_eval(&@beg_act) if @beg_act
-    @exe.each do |record|
-      @nr += 1
-      @a = record.split(@fs)
-      @nf = @a.length
-      @r = record
+  end
 
-      self.instance_eval(&@act)
+  def init_line
+    @a = line.split(@fs)
+    @nf = @a.length
+    @r = line
+  end
+
+  def stream_end
+    self.instance_eval(&@end_act) if @end_act
+  end
+
+  def eval
+    result = nil
+    @exe.pipe_out do |pipe|
+      result = process_stream(pipe,$stdout)
     end
-
-    return self.instance_eval(&@end_act) if @end_act
+    return result
   end
   
-  # one clause is enough
-  def act(&block)
-    @act = block
-    self
-  end
-
   def begin(&block)
     @beg_act = block
     self

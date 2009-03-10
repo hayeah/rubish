@@ -24,22 +24,11 @@ class Rubish::Sed < Rubish::Executable
     self.puts(string || line)
   end
 
-  def puts(*args)
-    output.puts args
-  end
-
-  def pp(obj)
-    output.pp obj
-  end
-
   private
 
-  attr_reader :output
-  
   def exec_with(_i,o,_e)
-    @output = o # i think only the output IO parameter makes sense.
     @exe.pipe_out do |pipe|
-      process_stream(pipe)
+      process_stream(pipe,o)
     end
   end
 

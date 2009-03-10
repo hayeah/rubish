@@ -3,18 +3,29 @@
 # Power Fools of similar names.
 module Rubish::Streamer
   attr_accessor :line
+  attr_reader :output
   attr_reader :lineno
   
   def init_streamer
     @acts = []
+    @output = nil # the IO object that puts and pp should write to.
     @buffer = [] # look ahead buffer for peek(n)
     @line = nil # the current line ("pattern space" in sed speak)
     @lineno = 0 # current line number
     @interrupt = nil # a few methods could interrupt the sed process loop.
   end
 
-  def process_stream(stream)
+  def puts(*args)
+    output.puts args
+  end
+
+  def pp(obj)
+    output.pp obj
+  end
+
+  def process_stream(stream,output)
     raise "should init streamer with an IO object" unless stream.is_a?(IO)
+    @output = output
     @stream = stream
     begin
       stream_begin # abstract
@@ -41,8 +52,9 @@ module Rubish::Streamer
         end
       end
     ensure
-      stream_end # abstract
+      result = stream_end # abstract
     end
+    return result
   end
 
   def stream_begin
@@ -53,6 +65,8 @@ module Rubish::Streamer
     raise "abstract"
   end
 
+  # the return value of this method is taken to be
+  # the return value of process_stream
   def stream_end
     raise "abstract"
   end
