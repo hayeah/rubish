@@ -76,27 +76,34 @@ class Rubish::Executable
   end
 
   def each
+    self.pipe_out do |r|
+      r.each_line do |l|
+        yield(l)
+      end
+    end
+  end
+
+  def map
+    acc = []
+    self.each do |l|
+      acc << (block_given? ? yield(l) : l )
+    end
+    acc
+  end
+
+  def pipe_out
     begin
       old_o = self.o
       r,w = IO.pipe
       self.o(w)
       self.exec
       w.close
-      r.each_line do |l|
-        yield(l)
-      end
+      yield(r)
     ensure
       self.o(old_o)
       w.close if !w.closed?
+      r.close
     end
-  end
-
-  def map
-    acc = []
-    self.each_ do |l|
-      acc << (block_given? ? yield(l) : l )
-    end
-    acc
   end
 
   private
