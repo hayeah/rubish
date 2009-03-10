@@ -4,6 +4,10 @@ class Rubish::Executable
     Rubish::Awk.make(self,fs,&block)
   end
 
+  def sed(&block)
+    Rubish::Sed.new(self).act(&block)
+  end
+
   class AbnormalExits < RuntimeError
     attr_reader :statuses
     def initialize(statuses)
