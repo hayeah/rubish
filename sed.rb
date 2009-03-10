@@ -16,8 +16,8 @@ class Rubish::Sed < Rubish::Executable
     @o = o # i think only the output IO parameter makes sense.
     @exe.pipe_out do |pipe|
       @pipe = pipe
-      while line = get_line
-        @this = line
+      while string = get_string
+        @this = string
         interrupted = true
         catch :interrupt do
           @acts.each do |act|
@@ -52,10 +52,12 @@ class Rubish::Sed < Rubish::Executable
 
   # returns line and advances the cursor.
   # nil if EOF.
-  def get_line
+  def get_string
     # use line in lookahead buffer if there's any
     if @buffer.empty?
-      @pipe.gets
+      r = @pipe.gets
+      r.chomp! if r
+      return r
     else
       @buffer.shift
     end
@@ -72,6 +74,7 @@ class Rubish::Sed < Rubish::Executable
     n.times do |i|
       s = @pipe.gets
       break if s.nil? # EOF
+      s.chomp!
       lines << s
       @buffer << s
     end
