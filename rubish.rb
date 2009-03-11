@@ -41,6 +41,7 @@ end
 # Rubish::Command < Rubish::Executable
 # Rubish::CommandBuilder < Rubish::Command
 # Rubish::Pipe < Rubish::Executable
+# Rubish::Awk < Rubish::Executable
 class Rubish::Executable
   # stub, see: executable.rb
   def exec
@@ -48,13 +49,13 @@ class Rubish::Executable
   end
 end
 
-# objects that rubish shell tries to eval to return an ruby value.
-# Rubish::Awk < Rubish::Evaluable
-class Rubish::Evaluable
-  def eval
-    raise "abstract"
-  end
-end
+# not entirely sure if this makes sense anymore
+# # objects that rubish shell tries to eval and return an ruby value.
+# class Rubish::Evaluable < Rubish::Executable
+#   def eval
+#     raise "abstract"
+#   end
+# end
 
 # This is an object that doesn't respond to anything.
 #

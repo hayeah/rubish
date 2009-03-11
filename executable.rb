@@ -32,7 +32,7 @@ class Rubish::Executable
       o, close_o, thread_o = __prepare_io(o,"w")
       e, close_e, thread_e = __prepare_io(e,"w")
       # exec_with forks processes that communicate with Rubish via IPCs
-      exec_with((i || $stdin), (o || $stdout), (e || $stderr))
+      result = exec_with((i || $stdin), (o || $stdout), (e || $stderr))
       statuses = Process.waitall.map { |r| r[1] }
       bads = statuses.select do |s|
         s if s.to_i != 0 
@@ -40,6 +40,7 @@ class Rubish::Executable
       if !bads.empty?
         raise AbnormalExits.new(bads)
       end
+      return result
     ensure
       # i,o,e could've already been closed by an IO thread (when a block is used).
       i.close if close_i && !i.closed?
@@ -137,7 +138,7 @@ class Rubish::Executable
       return io, false
     when String
       path = File.expand_path(io)
-      raise "not a file" unless File.file?(path)
+      raise "path is a directory" if File.directory?(path)
       return File.new(path,mode), true
     when Integer
       fd = io

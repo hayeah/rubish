@@ -27,7 +27,7 @@ class Rubish::Command < Rubish::Executable
         Kernel.exit(1)
       end
     end
-    return pid
+    return nil
   end
 
   def to_s

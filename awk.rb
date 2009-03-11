@@ -1,6 +1,4 @@
-# awkish wrapper to Rubish::Executable types to
-# produce ruby values
-class Rubish::Awk < Rubish::Evaluable
+class Rubish::Awk < Rubish::Executable
   include Rubish::Streamer
   
   class << self
@@ -61,10 +59,10 @@ class Rubish::Awk < Rubish::Evaluable
     self.instance_eval(&@end_act) if @end_act
   end
 
-  def eval
+  def exec_with(i,o,e)
     result = nil
     @exe.pipe_out do |pipe|
-      result = process_stream(pipe,$stdout)
+      result = process_stream(pipe,o)
     end
     return result
   end

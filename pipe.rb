@@ -71,7 +71,8 @@ class Rubish::Pipe < Rubish::Executable
         end
       end
     end
-    return pids
+    #return pids
+    return nil
   end
   
 end

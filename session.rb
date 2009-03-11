@@ -59,10 +59,11 @@ class Rubish::Session
     ## processing model better, where non matched lines (nil) are just
     ## swallowed.
     if r.is_a?(Rubish::Executable)
-      r.exec
-      # hmmm... should it do anything with the return value of r.exec?
-    elsif r.is_a?(Rubish::Evaluable)
-      submit(r.eval)
+      result  = r.exec
+      pp result if result
+      
+#     elsif r.is_a?(Rubish::Evaluable)
+#       submit(r.eval)
     else r
       pp r
     end
