@@ -5,6 +5,7 @@ module Rubish::Streamer
   attr_accessor :line
   attr_reader :output
   attr_reader :lineno
+  attr_reader :buckets, :bucket_types
   
   def init_streamer
     @acts = []
@@ -13,6 +14,8 @@ module Rubish::Streamer
     @line = nil # the current line ("pattern space" in sed speak)
     @lineno = 0 # current line number
     @interrupt = nil # a few methods could interrupt the sed process loop.
+    @buckets = {}
+    @bucket_types = {}
   end
 
   def puts(*args)
@@ -22,6 +25,9 @@ module Rubish::Streamer
   def pp(obj)
     output.pp obj
   end
+
+  ##################################################
+  # Line Buffer Handling Stuff
 
   def process_stream(stream,output)
     raise "should init streamer with an IO object" unless stream.is_a?(IO)
@@ -71,7 +77,8 @@ module Rubish::Streamer
     raise "abstract"
   end
 
-  def act(&block)
+  def act(address=nil,&block)
+    raise "addressed action not implemented yet" if address
     @acts << block
     return self
   end
@@ -131,5 +138,105 @@ module Rubish::Streamer
   def quit
     interrupt(:quit)
   end
+
+  ##################################################
+  # Bucket Handling Stuff
+
+  
+  # common-lisp loopesque helpers
+  def count(name,key=nil)
+    create_bucket(:count,name,0)
+    update_bucket(name,[key,nil]) do |old_c,ignore|
+      old_c + 1
+    end
+  end
+
+  def pick(name,val,key=nil)
+    create_bucket(:pick,name,nil)
+    update_bucket(name,val,key) do |old_v,new_v|
+      if old_v.nil?
+        new_v
+      else
+        yield(old_v,new_v)
+      end
+    end
+  end
+  
+  def max(name,val,key=nil)
+    create_bucket(:max,name,nil)
+    update_bucket(name,val,key) do |old,new|
+      if old.nil?
+        new
+      elsif new > old
+        new
+      else
+        old
+      end
+    end
+  end
+
+  def min(name,val,key=nil)
+    create_bucket(:min,name,nil)
+    update_bucket(name,val,key) do |old,new|
+      if old.nil?
+        new
+      elsif new < old
+        new
+      else
+        old
+      end
+    end
+  end
+
+  def collect(name,val,key=nil)
+    create_bucket(:collect,name,nil)
+    update_bucket(name,val,key) do |acc,val|
+      if acc.nil?
+        acc = [val]
+      else
+        acc << val
+      end
+    end
+  end
+
+  private
+
+  # [type] denotes an aggregate of type
+  # type denotes the type itself (non-aggregate)
+  def create_bucket(type,name,init_val)
+    name = name.to_s
+    if buckets.has_key?(name)
+      raise "conflict bucket types for: #{name}" unless bucket_types[name] == type
+      return false
+    else
+      raise "bucket name conflicts with existing method: #{name}" if self.respond_to?(name)
+      bucket_types[name] = type
+      buckets[name] = Hash.new(init_val)
+      #singleton = class << self; self; end
+
+      defstr = <<-HERE
+def #{name}(key=nil)
+  buckets["#{name}"][key]
+end
+HERE
+      self.instance_eval(defstr)
+
+
+    end
+    return true
+  end
+  
+  def update_bucket(name,val,key=nil)
+    name = name.to_s
+    # if a key is given, update the key specific sub-bucket.
+    if key
+      new_val = yield(buckets[name][key],val)
+      buckets[name][key] = new_val
+    end
+    # always update the special nil key.
+    new_val = yield(buckets[name][nil],val)
+    buckets[name][nil] = new_val
+  end
+
   
 end

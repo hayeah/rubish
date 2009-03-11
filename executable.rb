@@ -1,10 +1,11 @@
 class Rubish::Executable
 
-  def awk(fs=nil,&block)
-    Rubish::Awk.make(self,fs,&block)
+  def awk(address=nil,&block)
+    Rubish::Awk.new(self).act(&block)
   end
 
-  def sed(&block)
+  
+  def sed(address=nil,&block)
     Rubish::Sed.new(self).act(&block)
   end
 
