@@ -189,6 +189,10 @@ module Rubish::Streamer
   end
 
   def collect(name,val,key=nil)
+    # the initial value should be nil, if it's the
+    # empty array, it would be shared among all
+    # the buckets (which is incorrect (since we
+    # are doing destructive append))
     create_bucket(:collect,name,nil)
     update_bucket(name,val,key) do |acc,val|
       if acc.nil?
@@ -196,6 +200,24 @@ module Rubish::Streamer
       else
         acc << val
       end
+      acc
+    end
+  end
+
+  # size-limited FIFO buffer
+  def hold(name,size,val,key=nil)
+    raise "hold size should be larger than 1" unless size > 1
+    create_bucket(:hold,name,nil)
+    update_bucket(name,val,key) do |acc,val|
+      if acc.nil?
+        acc = [val]
+      elsif acc.length < size
+        acc << val
+      else
+        acc.shift
+        acc << val
+      end
+      acc
     end
   end
 
@@ -204,7 +226,7 @@ module Rubish::Streamer
   # [type] denotes an aggregate of type
   # type denotes the type itself (non-aggregate)
   def create_bucket(type,name,init_val)
-    name = name.to_s
+    name = name.to_sym
     if buckets.has_key?(name)
       raise "conflict bucket types for: #{name}" unless bucket_types[name] == type
       return false
@@ -215,8 +237,8 @@ module Rubish::Streamer
       #singleton = class << self; self; end
 
       defstr = <<-HERE
-def #{name}(key=nil)
-  buckets["#{name}"][key]
+def #{name.to_s}(key=nil)
+  buckets[:#{name.to_s}][key]
 end
 HERE
       self.instance_eval(defstr)
@@ -227,7 +249,7 @@ HERE
   end
   
   def update_bucket(name,val,key=nil)
-    name = name.to_s
+    name = name.to_sym
     # if a key is given, update the key specific sub-bucket.
     if key
       new_val = yield(buckets[name][key],val)
