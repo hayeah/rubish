@@ -1,6 +1,6 @@
 h1. Rubish
 
-Rubish is shell in Ruby. It is *object oriented*,
+Rubish is a shell in Ruby. It is *object oriented*,
 and it only uses Ruby's own syntax (*no
 metasyntax* of its own). Rubish is pronounced
 Roobish, as opposed to Rubbish, unlike Bash.
@@ -12,7 +12,7 @@ from the repository:
 
   $ git clone git://github.com/hayeah/rubish.git
 
-Fire up a irb, and start Rubish
+Fire up an irb, and start Rubish
 
   $ irb
   irb> load 'rubish.rb'
@@ -22,20 +22,20 @@ Fire up a irb, and start Rubish
   rbh> uname :svrm
   Linux 2.6.24-16-generic #1 SMP Thu Apr 10 13:23:42 UTC 2008 i686
 
-A few tips upfront. Sometimes Rubish might mess up
-your terminal. In which case, keep hitting
-C-c and C-d to exit back to Bash, then enter,
+A few tips upfront. Sometimes Rubish could mess up
+your terminal. If that happens, try hitting
+C-c and C-d to get back to Bash, then,
 
   $ reset
 
 to reset your terminal. Also, Rubish doesn't have
 shell history. But it uses the readline library,
-so you can use its history mechanism. @C-r
-<string>@ to match a previously entered line with
+so you can use its history mechanism. C-r
+<string> to match a previously entered line with
 string.
 
-If you make changes to Rubish, you can hit C-c to
-go back to irb, and,
+If you make changes to Rubish, you hit C-c to go
+back to irb, and,
 
 <pre><code>
   # reload code
@@ -44,21 +44,18 @@ go back to irb, and,
   irb> Rubish.repl
 </code></pre>
 
-We'll just use the "ls" command as example, on the
-rubish directory itself.
-
 h2. Command
 
-Rubish REPL takes a line and @instance_eval@ it
-with the shell session object. If the a method is
-undefined, that's translated into a Executable
-object.
+Rubish REPL takes a line and @instance_eval@ s it
+with the shell session object. If the method is
+undefined, they call is translated into a
+Executable object with @method_missing@.
 
 <pre><code>
 rbh> ls
 awk.rb	command_builder.rb  command.rb executable.rb  LICENSE	pipe.rb  README.textile rubish.rb  sed.rb  session.rb	streamer.rb
 
-# ls actually evaluates to a command object, which
+# ls evaluates to a Rubish::Command object, which
 # is a subclass of Rubish::Executable
 rbh> ls.inspect
 "#<Rubish::Command::ShellCommand:0xb7ac297c @args=\"\", @status=nil, @cmd=\"ls \">"
@@ -74,15 +71,13 @@ rbh> @cmd
 awk.rb	command_builder.rb  command.rb	executable.rb  LICENSE	pipe.rb  README.textile  rubish.rb  sed.rb  session.rb	streamer.rb
 </code></pre>
 
-You can invoke a command with arguments of
-String, Symbol, or Array (of String, Symbol, or
-Array (recursively)). A String argument is taken
-as it is. A Symbol is translated to a flag (:flag
-== -flag). Arguments in an Array is treated
-likewise. At the end, all the arguments are
-flatten and concatenated. (Yup, the flatten part
-sounds like perl. But it makes sense in this
-context.)
+You can invoke a command with arguments of String,
+Symbol, or Array (of String, Symbol, or Array
+(recursively)). A String argument is taken as it
+is. A Symbol is translated to a flag (:flag
+=> -flag). Arguments in an Array are treated
+likewise. Finally, all the arguments are flatten
+and joined together.
 
 The followings are equivalent,
 <pre><code>
@@ -121,15 +116,15 @@ class values too!
   # execute @pipe again
 </code></pre>
 
-h2. IO redirection
+h2. IO redirections
   
-IO redirection are done via methods defined on
+IO redirections are done by methods defined in
 @Rubish::Executable@.
 
   Rubish::Executable#i(io=nil)
     Set the $stdin of the executable when
     it is executed. If called without an argument,
-    returns the executable's IO object.
+    return the executable's IO object.
   Rubish::Executable#o(io=nil)
     Ditto for $stdout
   Rubish::Executable#err(io=nil)
@@ -155,7 +150,7 @@ streamer.rb
 Rubish can take 4 kinds of objects for IO. String
 (used as a file), Integer (used as file
 descriptor), IO object, or a ruby block. Using the
-a block as IO, the block receives a pipe
+a block for IO, the block receives a pipe
 connecting it to the command, for reading or writing.
 
 <pre><code>
@@ -167,7 +162,7 @@ rbh> cat.i { |p| p.puts((1..5).to_a) }
 4
 5
 
-# upercase all filenames
+# upcase all filenames
 rbh> ls.o { |p| p.each_line {|l| puts l.upcase} }
 AWK.RB
 COMMAND_BUILDER.RB
@@ -182,7 +177,7 @@ SED.RB
 SESSION.RB
 STREAMER.RB
 
-# kinda funny, pump numbers into cat, then read
+# kinda funny, pump numbers into cat, then pull
 # them out again.
 rbh> cat.i { |p| p.puts((1..10).to_a) }.o {|p| p.each_line {|l| puts l.to_i+100 }}
 101
@@ -198,9 +193,9 @@ rbh> cat.i { |p| p.puts((1..10).to_a) }.o {|p| p.each_line {|l| puts l.to_i+100 
 </code></pre>
 
 The input and output blocks are executed in their
-own threads. Ya, use them at your own peril. Next
+own threads. Use them at your own peril. Next
 section shows another way to process output with
-ruby w/o using threads.
+ruby without using threads.
 
 h2. Rubish with Ruby
 
@@ -210,7 +205,7 @@ command with Ruby.
   Rubish::Executable#each
     yield each line of output to a block.
   Rubish::Executable#map
-    Like each, but collect the values returned by
+    Like #each, but collect the values returned by
     the block. If no block given, collect each
     line of the output.
 
@@ -220,7 +215,7 @@ lines.
 
 <pre><code>
 # print filename and its extension side by side.
-rbh> ls.each { |f| puts "#{f.strip}\t#{File.extname(f)}" }
+rbh> ls.each { |f| puts "#{f}\t#{File.extname(f)}" }
 address.rb	.rb
 awk.output	.output
 awk.rb	.rb
@@ -265,7 +260,7 @@ rbh> ls.each { |f| wc(f).exec  }
  264  708 5906 streamer.rb
 </code></pre>
 
-One nifty thing to do is to collect the output of
+One nifty thing to do is to collect the outputs of
 nested commands.
 
 <pre><code>
@@ -288,8 +283,8 @@ rbh> ls.map {|f| stat(f).map }
 ]
 </code></pre>
 
-All the above applies to pipes as well. We can
-find out how many files on in a directory as a
+All the above apply to pipes as well. We can
+find out how many files are in a directory as a
 Ruby Integer.
 
 <pre><code>
@@ -310,7 +305,9 @@ Rubish has sedish and awkish things that are not quite
 like sed and awk, but not entirely unlike sed and
 awk.
 
-Rubish::Sed does not print by default.
+Rubish::Sed doesn't implicitly print (unlike real
+sed). There's actually no option to turn on
+implicit printing.
 
 <pre><code>
   Rubish::Sed#line
@@ -341,13 +338,14 @@ streamer.rbee
 rbh> ls.sed { p }.o "sed.result"
 </code></pre>
 
-Rubish::Sed doesn't have the concept of swapping,
-appending, modifying pattern space and hold
-space. Good riddance. The block is @instance_eval@
-by the Sed object, so you can keep track of state
-using instance variables.
+Rubish::Sed doesn't have the concepts of swapping,
+appending, modifying, or any interaction between
+pattern space and hold space. Good riddance. The
+block is @instance_eval@ by the Sed object, so you
+can keep track of state using instance variables.
 
-Awk is a lot like sed.
+Awk is a lot like sed. But you can associate
+actions to be done before or after awk processing.
 
   Rubish::Awk#begin(&block)
     block is instance_eval by the Awk object
@@ -378,7 +376,7 @@ in left-to-right order.
 
 h2. Streamer
 
-Rubish::{Sed,Awk} actually shares the
+Rubish::{Sed,Awk} actually share the
 Rubish::Streamer mixin. Most of their mechanisms
 are implemented by this mixin. It has two
 interesting features:
@@ -393,7 +391,7 @@ inspired by Common Lisp's Loop facilities.
 Let's see line buffering first.
 
   Rubish::Streamer#peek(n=1)
-    Returns the next n lines (Array of Strings),
+    Return the next n lines (as Array of Strings),
     and put these lines in the stream buffer.
   Rubish::Streamer#skip(n=1)
     Skip the next n lines.
@@ -407,7 +405,7 @@ By the way, isn't it nice that these methods all
 have four chars?
 
 <pre><code>
-  # print files in groups of 4. Try that with sed.
+  # print files in groups of 3, separated by blank lines.
   rbh> ls.sed { p; puts peek(2); puts ""; skip(3) }
 </code></pre>
 
@@ -427,7 +425,7 @@ is used to partition an aggregation.
   Rubish::Streamer#hold(name,size,val,key=nil)
     collect vals into a fixed-size FIFO queue.
   Rubish::Streamer#pick(name,val,key=nil,&block)
-    this passes the block old_val and new_val, and
+    pass the block old_val and new_val, and
     the value returned by block is saved in
     "name".
 
@@ -435,7 +433,7 @@ Each aggregator's name is used to create a
 bucket. A reader method named by name can be used
 to access that bucket. A bucket is a hash of
 partitioned accumulation keyed by key. The special
-key nil is used as the global accumulator (like
+key nil aggregates over the entire domain (like
 MySQL's rollup).
     
 <pre><code>
@@ -475,10 +473,10 @@ rbh> ls.awk { f=a[0]; max(:fl,f.length,File.extname(f)); collect(:fn,f)}.end { p
   "streamer.rb"]]
 </code></pre>
 
-Note that @fl@ is the same as @fl(nil)@, which
-yields the max length over all the files. And
-@fl("")@ yields the max length over files without
-extension.
-
+The first printout of hash is from @pp
+buckets@. You can see the aggregation partitioned
+by file extensions (in the case of @fl@). Note
+that @fl(nil)@ holds the max length over all the
+files (the entire domain).
 
 Happy Hacking!
