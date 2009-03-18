@@ -64,7 +64,7 @@ class Rubish::Session
       
 #     elsif r.is_a?(Rubish::Evaluable)
 #       submit(r.eval)
-    else r
+    elsif r != Rubish::Null
       pp r
     end
   end

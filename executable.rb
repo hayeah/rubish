@@ -96,7 +96,7 @@ class Rubish::Executable
         yield(l)
       end
     end
-    nil
+    return Rubish::Null
   end
 
   def map

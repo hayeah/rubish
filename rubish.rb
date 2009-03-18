@@ -3,6 +3,10 @@ require 'pp'
 require 'fileutils'
 
 module Rubish
+  # magic singleton value to supress shell output.
+  module Null
+  end
+  
   class << self
     def repl
       ss = Rubish::Session.new
