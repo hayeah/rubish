@@ -36,10 +36,12 @@ string.
 If you make changes to Rubish, you can hit C-c to
 go back to irb, and,
 
+<pre><code>
   # reload code
   irb> load 'rubish.rb'
   # start a new session
   irb> Rubish.repl
+</code></pre>
 
 h2. Command
 
@@ -48,6 +50,7 @@ with the shell session object. If the a method is
 undefined, that's translated into a Executable
 object.
 
+<pre><code>
   rbh> ls
    ... files ...
   # you can store exe objects
@@ -56,7 +59,8 @@ object.
   # an exe is executed if it's the return value of a line.
   rbh> @cmd
    ... files ...
-  
+</code></pre>
+
 You can invoke a command with arguments of
 String, Symbol, or Array (of String, Symbol, or
 Array (recursively)). A String argument is taken
@@ -81,12 +85,14 @@ Pipe and Command actually share the same parent
 object: @Rubish::Executable@. So pipes are first
 class values too!
 
+<pre><code>
   rbh> @pipe = p { cmd1; cmd2; cmd3 } ; nil
   # again, we return nil so @pipe doesn't get executed.
   rbh> @pipe
   # execute @pipe once
   rbh> @pipe
   # execute @pipe again
+</code></pre>
 
 h2. IO redirection
   
@@ -102,6 +108,7 @@ IO redirection are done via methods defined on
   Rubish::Executable#err(io=nil)
     Ditto for @$stderr@
 
+<pre><code>
   rbh> cmd.i
   $stdin
   rbh> cmd.o
@@ -110,6 +117,7 @@ IO redirection are done via methods defined on
   # execute cmd using @some_io_object@ as stdin.
   rbh> cmd.io(some_io,some_other_io)
   # shorthand to set stdin and stdout
+</code></pre>
 
 Rubish can take 4 kinds of objects for IO. String
 (used as a file), Integer (used as file
@@ -117,12 +125,14 @@ descriptor), IO object, or a ruby block. The last
 one is interesting, you get a pipe to read from or
 write into the command.
 
+<pre><code>
   # write into the cmd from ruby
   rbh> cmd.i {|p| p.puts [1,2,3] }
   # read from the cmd
   rbh> cmd.o {|p| p.each_line { |line| puts line}}
   # you can do both
   rbh> cmd.i {|p| ... }.o {|p| ... }
+</code></pre>
 
 The input and output blocks are executed in their
 own threads.
