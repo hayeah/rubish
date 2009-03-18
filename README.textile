@@ -312,6 +312,7 @@ awk.
 
 Rubish::Sed does not print by default.
 
+<pre><code>
   Rubish::Sed#line
     the current line sed is processing
   Rubish::Sed#p(*args)
@@ -322,6 +323,7 @@ Rubish::Sed does not print by default.
     String#gsub! on the current line
   Rubish::Sed#q
     quit from sed processing.
+</code></pre>
 
 <pre><code>
 rbh> ls.sed { gs /b/, "bee"; p if line =~ /.rbee$/ }
