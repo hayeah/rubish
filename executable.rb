@@ -92,9 +92,11 @@ class Rubish::Executable
   def each
     self.pipe_out do |r|
       r.each_line do |l|
+        l.chomp!
         yield(l)
       end
     end
+    nil
   end
 
   def map
