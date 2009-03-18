@@ -1,0 +1,132 @@
+h1. Rubish
+
+Rubish is shell in Ruby. It is *object oriented*,
+and it only uses Ruby's own syntax (*no
+metasyntax* of its own). 
+
+h2. Getting Started
+
+There's no proper distribution yet. Just fetch it
+from the repository: 
+
+  $ git clone git://github.com/hayeah/rubish.git
+
+Fire up a irb, and start Rubish
+
+  $ irb
+  irb> load 'rubish.rb'
+  irb> Rubish.repl
+  rbh> date
+  Tue Mar 17 17:06:04 PDT 2009
+  rbh> uname :svrm
+  Linux 2.6.24-16-generic #1 SMP Thu Apr 10 13:23:42 UTC 2008 i686
+
+A few tips upfront. Sometimes Rubish might mess up
+your terminal. In which case, alternate between
+C-c and C-d to exit back to Bash, and enter,
+
+  $ reset
+
+to reset your terminal. Also, Rubish doesn't have
+history builtin. But since it uses the readline
+library, you can use its history mechanism. @C-r
+<string>@ to match a previously entered line with
+string.
+
+If you make changes to Rubish, you can hit C-c to
+go back to irb, and,
+
+  # reload code
+  irb> load 'rubish.rb'
+  # start a new session
+  irb> Rubish.repl
+
+h2. Command
+
+Rubish REPL takes a line and @instance_eval@ it
+with the shell session object. If the a method is
+undefined, that's translated into a Executable
+object.
+
+  rbh> ls
+   ... files ...
+  # you can store exe objects
+  rbh> @cmd = ls; false
+  false
+  # an exe is executed if it's the return value of a line.
+  rbh> @cmd
+   ... files ...
+  
+You can invoke a command with arguments of
+String, Symbol, or Array (of String, Symbol, or
+Array (recursively)). A String argument is taken
+as it is. A Symbol is translated to a flag (:flag
+== -flag). Arguments in an Array is treated
+likewise. At the end, all the arguments are
+flatten and concatenated. (Yup, the flatten part
+sounds like perl. But it makes sense in this
+context.)
+
+The followings are equivalent,
+
+  rbh> cmd :abc, "arg1", "arg2", "arg3"
+  rbh> cmd "-abc arg1 arg2 arg3"
+  rbh> cmd :abc, %w(arg1 arg2 arg3)
+
+h2. Pipe
+
+  rbh> p { cmd1; cmd2; cmd3 }
+
+Pipe and Command actually share the same parent
+object: @Rubish::Executable@. So pipes are first
+class values too!
+
+  rbh> @pipe = p { cmd1; cmd2; cmd3 } ; nil
+  # again, we return nil so @pipe doesn't get executed.
+  rbh> @pipe
+  # execute @pipe once
+  rbh> @pipe
+  # execute @pipe again
+
+h2. IO redirection
+  
+IO redirection are done via methods defined on
+@Rubish::Executable@.
+
+  Rubish::Executable#i(io=nil)
+    Set the @$stdin@ of the executable when
+    it is executed. If called without an argument,
+    returns the executable's IO object.
+  Rubish::Executable#o(io=nil)
+    Ditto for @$stdout@
+  Rubish::Executable#err(io=nil)
+    Ditto for @$stderr@
+
+  rbh> cmd.i
+  $stdin
+  rbh> cmd.o
+  $stdout
+  rbh> cmd.i(some_io_object)
+  # execute cmd using @some_io_object@ as stdin.
+  rbh> cmd.io(some_io,some_other_io)
+  # shorthand to set stdin and stdout
+
+Rubish can take 4 kinds of objects for IO. String
+(used as a file), Integer (used as file
+descriptor), IO object, or a ruby block. The last
+one is interesting, you get a pipe to read from or
+write into the command.
+
+  # write into the cmd from ruby
+  rbh> cmd.i {|p| p.puts [1,2,3] }
+  # read from the cmd
+  rbh> cmd.o {|p| p.each_line { |line| puts line}}
+  # you can do both
+  rbh> cmd.i {|p| ... }.o {|p| ... }
+
+The input and output blocks are executed in their
+own threads.
+
+
+
+
