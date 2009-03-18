@@ -1,12 +1,20 @@
 class Rubish::Executable
 
   def awk(address=nil,&block)
-    Rubish::Awk.new(self).act(&block)
+    if block
+      Rubish::Awk.new(self).act(&block)
+    else
+      Rubish::Awk.new(self)
+    end
   end
 
   
   def sed(address=nil,&block)
-    Rubish::Sed.new(self).act(&block)
+    if block
+      Rubish::Sed.new(self).act(&block)
+    else
+      Rubish::Sed.new(self)
+    end
   end
 
   class AbnormalExits < RuntimeError
