@@ -123,9 +123,12 @@ class Rubish::Executable
   private
 
   def __wait_thread(thread)
-    thread.join(1)
-    if thread.alive?
-      thread.kill
+    begin
+      thread.join
+    ensure
+      if thread.alive?
+        thread.kill
+      end
     end
   end
 
