@@ -125,7 +125,7 @@ module Rubish::Streamer
   # returns true otherwise.
   def skip(n=1)
     n.times do
-      return false unless get_line
+      return false unless get_string
     end
     return !peek.nil?
   end
