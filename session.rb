@@ -82,7 +82,7 @@ class Rubish::Session
   end
 
   def read
-    line = Readline.readline('> ')
+    line = Readline.readline('rbh> ')
     Readline::HISTORY.push(line) if !line.empty?
     line
   end
