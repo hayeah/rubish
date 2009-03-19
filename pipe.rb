@@ -18,7 +18,7 @@ class Rubish::Pipe < Rubish::Executable
       raise "not supported yet"
       @cmds << [args,block]
     else
-      cmd = Rubish::Command::ShellCommand.new(m,args)
+      cmd = Rubish::Command.new(m,args)
       @cmds << cmd
       return cmd
     end
