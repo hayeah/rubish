@@ -46,4 +46,7 @@ Rake::RDocTask.new do |rdoc|
   rdoc.rdoc_files.include('lib/**/*.rb')
 end
 
+desc "Build and install gem"
+task :gem_install =>["gemspec", "build", "install"]
+
 task :default => :test
