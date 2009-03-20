@@ -5,9 +5,10 @@ and it only uses Ruby's own syntax (*no
 metasyntax* of its own). Rubish is pronounced
 Roobish, as opposed to Rubbish, unlike Bash.
 
-h2. Getting Started
+h2. From Gem
 
 Install:
+
   $ gem install hayeah-rubish --source http://gems.github.com
 
 Fire up an irb, and start Rubish
@@ -18,6 +19,16 @@ Fire up an irb, and start Rubish
   Tue Mar 17 17:06:04 PDT 2009
   rbh> uname :svrm
   Linux 2.6.24-16-generic #1 SMP Thu Apr 10 13:23:42 UTC 2008 i686
+
+h2. From Source
+
+Install:
+
+  $ git clone git://github.com/hayeah/rubish.git
+  $ ./bin/rubish
+  rbh>
+
+h2. Getting Started
 
 A few tips upfront. Sometimes Rubish could mess up
 your terminal. If that happens, try hitting
@@ -474,3 +485,10 @@ that @fl(nil)@ holds the max length over all the
 files (the entire domain).
 
 Happy Hacking!
+
+
+h1. Credit
+
+Created by Howard Yeh.
+
+Gem made available by "Gabriel Horner":http://tagaholic.me/.
