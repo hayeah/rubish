@@ -7,15 +7,12 @@ Roobish, as opposed to Rubbish, unlike Bash.
 
 h2. Getting Started
 
-There's no proper distribution yet. Just fetch it
-from the repository: 
-
-  $ git clone git://github.com/hayeah/rubish.git
+Install:
+  $ gem install hayeah-rubish --source http://gems.github.com
 
 Fire up an irb, and start Rubish
 
-  $ irb
-  irb> load 'rubish.rb'
+  $ irb -rrubish
   irb> Rubish.repl
   rbh> date
   Tue Mar 17 17:06:04 PDT 2009
@@ -38,10 +35,7 @@ If you make changes to Rubish, you hit C-c to go
 back to irb, and,
 
 <pre><code>
-  # reload code
-  irb> load 'rubish.rb'
-  # start a new session
-  irb> Rubish.repl
+  irb> Rubish.reload
 </code></pre>
 
 h2. Command
