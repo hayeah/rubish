@@ -1,3 +1,5 @@
+$:.unshift(File.dirname(__FILE__)) unless
+  $:.include?(File.dirname(__FILE__)) || $:.include?(File.expand_path(File.dirname(__FILE__)))
 
 require 'pp'
 require 'fileutils'
@@ -101,11 +103,11 @@ class Rubish::Mu
   
 end
 
-load 'executable.rb'
-load 'command.rb'
-load 'command_builder.rb'
-load 'pipe.rb'
-load 'streamer.rb'
-load 'sed.rb'
-load 'awk.rb'
-load 'session.rb'
+require 'rubish/executable'
+require 'rubish/command'
+require 'rubish/command_builder'
+require 'rubish/pipe'
+require 'rubish/streamer'
+require 'rubish/sed'
+require 'rubish/awk'
+require 'rubish/session'
