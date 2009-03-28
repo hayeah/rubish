@@ -17,6 +17,7 @@ class Rubish::Session
 
   def initialize
     @vars = {}
+    @scanner = RubyLex.new
   end
 
   # calling private method also goes here
@@ -28,29 +29,38 @@ class Rubish::Session
   end
 
   def repl
-    # don't ever try to do anything with mu except Mu#__instance_eval
     raise "$stdin is not a tty device" unless $stdin.tty?
+    raise "readline is not available??" unless defined?(IRB::ReadlineInputMethod)
+    __rl = IRB::ReadlineInputMethod.new
+
+    @scanner.set_prompt do |ltype, indent, continue, line_no|
+      # ltype is Delimiter type. In strings that are continued across a line break, %l will display the type of delimiter used to begin the string, so you'll know how to end it. The delimiter will be one of ", ', /, ], or `.
+      if ltype or indent > 0 or continue
+        p = ". "
+      else
+        p = "> "
+      end
+      if indent
+        p << " " * indent
+      end
+      __rl.prompt = p
+    end
+    
+    @scanner.set_input(__rl)
+
     __mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
     __mu.__extend Rubish::Session::Base
-    begin
-      attach_session
-      loop do
-        __line = read
-        if __line
-          begin
-            __r = __mu.__instance_eval(__line)
-            self.submit(__r)
-          rescue StandardError, ScriptError => __e
-            puts __e
-            puts __e.backtrace
-          end
-        else
-          next
-        end
+    @scanner.each_top_level_statement do |__line,__line_no|
+      begin
+        # don't ever try to do anything with mu except Mu#__instance_eval
+        __r = __mu.__instance_eval(__line)
+        self.submit(__r)
+      rescue StandardError, ScriptError => __e
+        puts __e
+        puts __e.backtrace
       end
-    ensure
-      detach_session
     end
+    
   end
 
   def submit(r)
@@ -69,17 +79,17 @@ class Rubish::Session
     end
   end
 
-  def attach_session
-    Rubish.session = self
-  end
+#   def attach_session
+#     Rubish.session = self
+#   end
 
-  def detach_session
-    if Rubish.session == self
-      Rubish.session = nil
-    else
-      raise "#{self} is not attached"
-    end
-  end
+#   def detach_session
+#     if Rubish.session == self
+#       Rubish.session = nil
+#     else
+#       raise "#{self} is not attached"
+#     end
+#   end
 
   def read
     line = Readline.readline('rbh> ')

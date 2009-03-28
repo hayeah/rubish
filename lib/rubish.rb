@@ -4,6 +4,8 @@ $:.unshift(File.dirname(__FILE__)) unless
 require 'pp'
 require 'fileutils'
 require 'readline'
+require 'irb/input-method'
+require 'irb/ruby-lex'
 
 require 'rubish/stub'
 require 'rubish/executable'
