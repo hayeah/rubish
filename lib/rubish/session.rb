@@ -1,7 +1,64 @@
 
 class Rubish::Session
 
+  class << self
+    def session(&block)
+      if block
+        @session.instance_eval &block
+      else
+        @session
+      end
+    end
+
+    def repl
+      begin
+        @session = Rubish::Session.new
+        @session.repl
+      end
+    end
+  end
+
+  module JobControl
+    def wait(*jobs)
+      job_control.wait(*jobs)
+    end
+
+    def waitall
+      job_control.waitall
+    end
+
+    def kill(job)
+      job_control.kill(job)
+    end
+
+    def jobs
+      job_control.jobs
+    end
+
+    def job_control
+      Rubish::Session.session.job_control
+    end
+
+    private
+
+    def job_started(job)
+      job_control.started(job)
+    end
+  end
+
+  include JobControl
+  attr_reader :job_control
+
+  def initialize
+    @vars = {}
+    @scanner = RubyLex.new
+    @job_control = Rubish::JobControl.new
+  end
+
+  
   module Base
+    include JobControl
+    
     def cd(dir)
       FileUtils.cd File.expand_path(dir)
     end
@@ -13,11 +70,7 @@ class Rubish::Session
     def awk
       Rubish::Awk.new
     end
-  end
-
-  def initialize
-    @vars = {}
-    @scanner = RubyLex.new
+    
   end
 
   # calling private method also goes here
@@ -60,18 +113,11 @@ class Rubish::Session
         puts __e.backtrace
       end
     end
-    
   end
 
   def submit(r)
-    # don't print nil
-    ## this special case is nauseating, but it fits the Unix cmd line
-    ## processing model better, where non matched lines (nil) are just
-    ## swallowed.
     if r.is_a?(Rubish::Executable)
-      result  = r.exec
-      pp result if result
-      
+      r.exec
 #     elsif r.is_a?(Rubish::Evaluable)
 #       submit(r.eval)
     elsif r != Rubish::Null
@@ -79,17 +125,7 @@ class Rubish::Session
     end
   end
 
-#   def attach_session
-#     Rubish.session = self
-#   end
-
-#   def detach_session
-#     if Rubish.session == self
-#       Rubish.session = nil
-#     else
-#       raise "#{self} is not attached"
-#     end
-#   end
+  
 
   def read
     line = Readline.readline('rbh> ')

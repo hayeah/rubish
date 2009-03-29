@@ -28,8 +28,9 @@ class Rubish::Command < Rubish::Executable
         puts $!
         Kernel.exit(1)
       end
+    else
+      return [pid]
     end
-    return nil
   end
 
   def to_s

@@ -8,6 +8,7 @@ require 'irb/input-method'
 require 'irb/ruby-lex'
 
 require 'rubish/stub'
+require 'rubish/job_control'
 require 'rubish/executable'
 require 'rubish/command'
 require 'rubish/command_builder'

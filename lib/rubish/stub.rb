@@ -6,13 +6,17 @@ module Rubish
   
   class << self
     def repl
-      ss = Rubish::Session.new
-      ss.repl
+      Rubish::Session.repl
+    end
+
+    def session
+      Rubish::Session.session
     end
 
     def reload
       (%w{
 rubish/stub
+rubish/job_control
 rubish/executable
 rubish/command
 rubish/command_builder
@@ -39,7 +43,7 @@ rubish/session
         end
       end
     end
-    attr_accessor :session
+    
   end
 end
 

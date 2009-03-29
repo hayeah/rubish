@@ -1,5 +1,138 @@
 class Rubish::Executable
 
+  # encapsulates the context of an executing job.
+  # handles cleanup
+  class Job < Rubish::JobControl::Job
+    
+    class << self
+      def start(exe)
+        self.new(exe)
+      end
+    end
+
+    class JobIO
+      attr_reader :thread
+      attr_reader :io
+      attr_reader :auto_close
+      
+      def initialize(io,auto_close,thread)
+        @io = io
+        @auto_close = auto_close
+        @thread = thread
+      end
+
+      def close
+        if auto_close
+          io.close
+        else
+          #io.flush if io.stat.writable?
+          #io.flush rescue true # try flushing
+        end
+        
+        if thread
+          begin
+            thread.join
+          ensure
+            if thread.alive?
+              thread.kill
+            end
+          end
+        end
+      end
+    end
+
+    attr_accessor :exitstatus
+    attr_accessor :ios
+    
+    def initialize(exe)
+      # prepare_io returns an instance of JobIO
+      i = prepare_io(exe.i || $stdin,"r")
+      o = prepare_io(exe.o || $stdout,"w")
+      e = prepare_io(exe.err || $stderr,"w")
+      @ios = [i,o,e]
+      pids = exe.exec_with(i.io,o.io,e.io)
+      super(pids)
+    end
+
+    # threads
+    # ios
+
+    def wait(&block)
+      r = nil
+      Rubish.session.job_control.wait(self)
+      cleanup
+      return r
+    end
+
+    def cleanup
+      @ios.each do |io|
+        io.close
+      end
+    end
+
+    # sorry, this is pretty hairy. This method
+    # instructs how exec should handle IO. (whether
+    # IO is done in a thread. whether it needs to be
+    # closed. (so on))
+    #
+    # an io could be
+    # String: interpreted as file name
+    # Number: file descriptor
+    # IO: Ruby IO object
+    # Block: executed in a thread, and a pipe connects the executable and the thread.
+    def prepare_io(io,mode)
+      # if the io given is a block, we execute it in a thread (passing it a pipe)
+      raise "invalid io mode: #{mode}" unless mode == "w" || mode == "r"
+      result =
+        case io
+        when $stdin, $stdout, $stderr
+          [io, false, nil]
+        when String
+          path = File.expand_path(io)
+          raise "path is a directory" if File.directory?(path)
+          [File.new(path,mode), true, nil]
+        when Integer
+          fd = io
+          [IO.new(fd,mode), false,nil]
+        when IO
+          [io, false,nil] 
+        when Proc
+          proc = io
+          r,w = IO.pipe
+          # if we want to use a block to
+          # (1) input into executable
+          #   - return "r" end from prepare_io, and
+          #   the executable use this and standard
+          #   input.
+          #   - let the thread block writes to the "w" end
+          # (2) read from executable
+          #   - return "w" from prepare_io
+          #   - let thread reads from "r"
+          return_io, thread_io =
+            case mode
+              # case 1
+            when "r"
+              [r,w]
+            when "w"
+              # case 2
+              [w,r]
+            end
+          thread = Thread.new do
+          begin
+            proc.call(thread_io)
+          ensure
+            thread_io.close
+          end
+        end
+          [return_io, true, thread]
+        else
+          raise "not a valid input: #{io}"
+        end
+      return JobIO.new(*result)
+    end
+
+  end
+
   def awk(address=nil,&block)
     if block
       Rubish::Awk.new(self).act(&block)
@@ -17,48 +150,27 @@ class Rubish::Executable
     end
   end
 
-  class AbnormalExits < RuntimeError
-    attr_reader :statuses
-    def initialize(statuses)
-      @statuses = statuses
-    end
+#   class AbnormalExits < RuntimeError
+#     attr_reader :statuses
+#     def initialize(statuses)
+#       @statuses = statuses
+#     end
 
-    def to_s
-      report = statuses.map { |s| "#{s.pid} => #{s.exitstatus}"}.join ";"
-      "<##{self.class}: #{report}>"
-    end
-  end
+#     def to_s
+#       report = statuses.map { |s| "#{s.pid} => #{s.exitstatus}"}.join ";"
+#       "<##{self.class}: #{report}>"
+#     end
+#   end
   
-  # an io could be
-  # String: interpreted as file name
-  # Number: file descriptor
-  # IO: Ruby IO object
-  # Block: executed in a thread, and a pipe connects the executable and the thread.
+  def exec!
+    Job.start(self)
+  end
+
+  # TODO catch interrupt here
   def exec
-    i,o,e = self.i, self.o, self.err
-    begin
-      i, close_i, thread_i = __prepare_io(i,"r")
-      o, close_o, thread_o = __prepare_io(o,"w")
-      e, close_e, thread_e = __prepare_io(e,"w")
-      # exec_with forks processes that communicate with Rubish via IPCs
-      result = exec_with((i || $stdin), (o || $stdout), (e || $stderr))
-      statuses = Process.waitall.map { |r| r[1] }
-      bads = statuses.select do |s|
-        s if s.to_i != 0 
-      end
-      if !bads.empty?
-        raise AbnormalExits.new(bads)
-      end
-      return result
-    ensure
-      # i,o,e could've already been closed by an IO thread (when a block is used).
-      i.close if close_i && !i.closed?
-      o.close if close_o && !o.closed?
-      e.close if close_e && !e.closed?
-      __wait_thread(thread_i) if thread_i
-      __wait_thread(thread_o) if thread_o
-      __wait_thread(thread_e) if thread_e
-    end
+    job = exec!
+    job.wait
+    job
   end
 
   def exec_with(i,o,e)
@@ -89,108 +201,35 @@ class Rubish::Executable
     self
   end
 
-  def each
-    self.pipe_out do |r|
-      r.each_line do |l|
-        l.chomp!
-        yield(l)
+  def each!(&block)
+    self.o do |pipe|
+      pipe.each_line do |line|
+        line.chomp!
+        block.call(line)
       end
     end
-    return Rubish::Null
+    job = self.exec!
+    return job
   end
 
-  def map
+  def each(&block)
+    job = self.each! &block
+    job.wait
+  end
+  
+  # acc is the accumulator passed in by reference, and updated destructively.
+  def map!(acc,&block)
+    job = self.each! do |l|
+      acc << (block.nil? ? l : block.call(l))
+    end
+    return job
+  end
+
+  def map(&block)
     acc = []
-    self.each do |l|
-      acc << (block_given? ? yield(l) : l )
-    end
-    acc
-  end
-
-  def pipe_out
-    begin
-      old_o = self.o
-      r,w = IO.pipe
-      self.o(w)
-      self.exec
-      w.close
-      yield(r)
-    ensure
-      self.o(old_o)
-      w.close if !w.closed?
-      r.close
-    end
-  end
-
-  private
-
-  def __wait_thread(thread)
-    begin
-      thread.join
-    ensure
-      if thread.alive?
-        thread.kill
-      end
-    end
-  end
-
-  # return <#IO>, <#Bool>, <#Thread> || nil
-  ## this is only called from Executable#exec, and
-  ## exec is responsible to close IO and join thread.
-  #
-  # sorry, this is pretty hairy. This method
-  # instructs how exec should handle IO. (whether
-  # IO is done in a thread. whether it needs to be
-  # closed. (so on))
-  def __prepare_io(io,mode)
-    # if the io given is a block, we execute it in a thread (passing it a pipe)
-    raise "invalid io mode: #{mode}" unless mode == "w" || mode == "r"
-    case io
-    when nil
-      return nil, false
-    when $stdin, $stdout, $stderr
-      return io, false
-    when String
-      path = File.expand_path(io)
-      raise "path is a directory" if File.directory?(path)
-      return File.new(path,mode), true
-    when Integer
-      fd = io
-      return IO.new(fd,mode), false
-    when IO
-      return io, false
-    when Proc
-      proc = io
-      r,w = IO.pipe
-      # if we want to use a block to
-      # (1) input into executable
-      #   - return "r" end from prepare_io, and
-      #   the executable use this and standard
-      #   input.
-      #   - let the thread block writes to the "w" end
-      # (2) read from executable
-      #   - return "w" from prepare_io
-      #   - let thread reads from "r"
-      return_io, thread_io =
-        case mode
-          # case 1
-        when "r"
-          [r,w]
-        when "w"
-          # case 2
-          [w,r]
-        end
-      thread = Thread.new do
-        begin
-          proc.call(thread_io)
-        ensure
-          thread_io.close
-        end
-      end
-      return return_io, true, thread
-    else
-      raise "not a valid input: #{io}"
-    end
+    job = self.map!(acc,&block)
+    job.wait
+    return acc
   end
   
 end
