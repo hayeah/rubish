@@ -37,6 +37,7 @@ class Rubish::JobControl
     rss = jobs.map do |job|
       statuses = job.pids.map do |pid|
         Process.wait(pid)
+        $?
       end
       job.exit_statuses = statuses
       remove(job)
@@ -54,7 +55,9 @@ class Rubish::JobControl
   end
 
   def kill(job,sig="TERM")
-    Process.kill(sig,job.pids)
+    job.pids.each do |pid|
+      Process.kill(sig,pid)
+    end
     wait(job)
   end
 

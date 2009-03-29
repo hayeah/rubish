@@ -67,10 +67,9 @@ class Rubish::Session
       Rubish::Pipe.new &block
     end
 
-    def awk
-      Rubish::Awk.new
-    end
-    
+#     def awk
+#       Rubish::Awk.new
+#     end
   end
 
   # calling private method also goes here

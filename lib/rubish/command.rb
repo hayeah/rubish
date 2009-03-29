@@ -12,24 +12,28 @@ class Rubish::Command < Rubish::Executable
   def exec_with(i,o,e)
     unless pid = Kernel.fork
       # child
-      begin
-        # dup2 the given i,o,e to stdin,stdout,stderr
-        # close all other file 
-        Rubish.set_stdioe(i,o,e)
-        # exec the command
-        if self.quoted
-          # use arguments as is
-          Kernel.exec self.cmd, *args
-        else
-          # want shell expansion of arguments
-          Kernel.exec "#{self.cmd} #{args.join " "}"
-        end
-      rescue
-        puts $!
-        Kernel.exit(1)
-      end
+      system_exec(i,o,e)
     else
       return [pid]
+    end
+  end
+
+  def system_exec(i,o,e)
+    begin
+      # dup2 the given i,o,e to stdin,stdout,stderr
+      # close all other file 
+      Rubish.set_stdioe(i,o,e)
+      # exec the command
+      if self.quoted
+        # use arguments as is
+        Kernel.exec self.cmd, *args
+      else
+        # want shell expansion of arguments
+        Kernel.exec "#{self.cmd} #{args.join " "}"
+      end
+    rescue
+      puts $!
+      Kernel.exit(1)
     end
   end
 

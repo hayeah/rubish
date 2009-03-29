@@ -14,7 +14,7 @@ class Rubish::Pipe < Rubish::Executable
   def mu_handler(m,args,block)
     # block's not actually used
     raise "command builder doesn't take a block" unless block.nil?
-    if m == :ruby
+    if m == :rb
       raise "not supported yet"
       @cmds << [args,block]
     else
@@ -62,17 +62,10 @@ class Rubish::Pipe < Rubish::Executable
         o.close unless tail
       else
         # Rubish.set_stdioe((cmd.i || i),(cmd.o || o),(cmd.err || pipe_err))
-        begin
-          Rubish.set_stdioe(i,o,pipe_err)
-          Kernel.exec cmd.cmd
-        rescue
-          puts $!
-          Kernel.exit(1)
-        end
+        cmd.system_exec(i,o,pipe_err)
       end
     end
-    #return pids
-    return nil
+    return pids
   end
   
 end

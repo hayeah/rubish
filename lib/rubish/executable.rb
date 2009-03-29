@@ -53,7 +53,7 @@ class Rubish::Executable
       pids = exe.exec_with(i.io,o.io,e.io)
       super(pids)
     end
-
+    
     # threads
     # ios
 
@@ -62,6 +62,10 @@ class Rubish::Executable
       Rubish.session.job_control.wait(self)
       cleanup
       return r
+    end
+
+    def kill
+      Rubish.session.job_control.kill(self)
     end
 
     def cleanup
@@ -133,32 +137,20 @@ class Rubish::Executable
 
   end
 
-  def awk(address=nil,&block)
-    if block
-      Rubish::Awk.new(self).act(&block)
-    else
-      Rubish::Awk.new(self)
-    end
-  end
+#   def awk(address=nil,&block)
+#     if block
+#       Rubish::Awk.new(self).act(&block)
+#     else
+#       Rubish::Awk.new(self)
+#     end
+#   end
 
   
-  def sed(address=nil,&block)
-    if block
-      Rubish::Sed.new(self).act(&block)
-    else
-      Rubish::Sed.new(self)
-    end
-  end
-
-#   class AbnormalExits < RuntimeError
-#     attr_reader :statuses
-#     def initialize(statuses)
-#       @statuses = statuses
-#     end
-
-#     def to_s
-#       report = statuses.map { |s| "#{s.pid} => #{s.exitstatus}"}.join ";"
-#       "<##{self.class}: #{report}>"
+#   def sed(address=nil,&block)
+#     if block
+#       Rubish::Sed.new(self).act(&block)
+#     else
+#       Rubish::Sed.new(self)
 #     end
 #   end
   
