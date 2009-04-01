@@ -6,24 +6,30 @@ h2. From Gem
 
 Install:
 
+<pre><code>
   $ gem install hayeah-rubish --source http://gems.github.com
+</code></pre>
 
 Fire up an irb, and start Rubish
 
+<pre><code>
   $ irb -rrubish
   irb> Rubish.repl
   rbh> date
   Tue Mar 17 17:06:04 PDT 2009
   rbh> uname :svrm
   Linux 2.6.24-16-generic #1 SMP Thu Apr 10 13:23:42 UTC 2008 i686
+</code></pre>
 
 h2. From Source
 
 Install:
 
+<pre><code>
   $ git clone git://github.com/hayeah/rubish.git
   $ ./bin/rubish
   rbh>
+</code></pre>
 
 h2. Getting Started
 
