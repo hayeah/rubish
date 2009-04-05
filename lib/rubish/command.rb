@@ -5,11 +5,12 @@ class Rubish::Command < Rubish::Executable
   attr_reader :quoted # if true, arguments for exec are not shell expanded.
   def initialize(cmd,args)
     @quoted = false
-    @args = parse_args(args)
+    @args = args
     @cmd = cmd.to_s
   end
   
   def exec_with(i,o,e)
+    normalize_args!
     unless pid = Kernel.fork
       # child
       system_exec(i,o,e)
@@ -18,10 +19,11 @@ class Rubish::Command < Rubish::Executable
     end
   end
 
+  # this method should be called after fork
   def system_exec(i,o,e)
     begin
       # dup2 the given i,o,e to stdin,stdout,stderr
-      # close all other file 
+      # close all other file
       Rubish.set_stdioe(i,o,e)
       # exec the command
       if self.quoted
@@ -38,7 +40,7 @@ class Rubish::Command < Rubish::Executable
   end
 
   def to_s
-    self.cmd
+    self.inspect
   end
 
   def q
@@ -50,25 +52,35 @@ class Rubish::Command < Rubish::Executable
     @quoted = false
     self
   end
+
+  def +(arg)
+    @args << arg
+    self
+  end
+
+  def %(arg)
+    @args = [arg]
+    self
+  end
   
   private
 
-  def parse_args(args)
-    rs = args.map do |arg|
+  def normalize_args!(args=@args)
+    args.map! do |arg|
       case arg
       when Symbol
         "-#{arg.to_s[0..-1]}"
       when Array
         # recursively flatten args
-        parse_args(arg)
+        normalize_args!(arg)
       when String
         arg
       else
         raise "argument to command should be one of Symbol, String, Array "
       end
     end
-    rs.flatten!
-    rs
+    args.flatten!
+    args
   end
 
 end
