@@ -6,21 +6,27 @@ module Rubish
   
   class << self
     def repl
-      Rubish::Session.repl
+      Session.repl
     end
 
+    def new_session
+      Session.new_session
+    end
+    
     def session
-      Rubish::Session.session
+      Session.session
     end
 
-    def begin(&block)
-      Rubish::Session.begin(&block)
+    def eval(string=nil,&block)
+      Session.eval(string,&block)
     end
 
     def reload
       (%w{
 rubish/stub
 rubish/job_control
+rubish/session
+rubish/workspace
 rubish/executable
 rubish/command
 rubish/command_builder
@@ -29,7 +35,6 @@ rubish/streamer} +
        %w{
 rubish/sed
 rubish/awk
-rubish/session
 }).each {|e| $".delete(e + '.rb') }
       require 'rubish'
       repl
@@ -98,21 +103,11 @@ class Rubish::Mu
   end
 
   def initialize(*modules,&block)
-    @missing_method_handler = block
-    modules.each do |mod|
-      self.__extend(mod)
-    end
+    raise "abstract"
   end
 
-  def method_missing(method,*args,&block)
-    if @missing_method_handler
-      @missing_method_handler.call(method,args,block)
-    else
-      print "missing: #{method}"
-      print "args:"
-      pp args
-      puts "block: #{block}"
-    end
+  def method_missing(*args,&block)
+    raise "abstract"
   end
   
 end

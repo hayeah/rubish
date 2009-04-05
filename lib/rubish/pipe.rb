@@ -1,31 +1,20 @@
 
 class Rubish::Pipe < Rubish::Executable
   attr_reader :cmds
-  def initialize(&block)
-    @cmds = []
-    if block
-      mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
-      mu.__instance_eval(&block)
-    end
+  
+  def initialize(workspace,&block)
+    cmds = []
+    workspace = workspace.__dup
+    workspace.command_factory_hook = Proc.new { |cmd| cmds << cmd; cmd}
+    workspace.eval &block
+    @cmds = cmds
     # dun wanna handle special case for now
     raise "pipe length less than 2" if @cmds.length < 2
   end
 
-  def mu_handler(m,args,block)
-    # block's not actually used
-    raise "command builder doesn't take a block" unless block.nil?
-    if m == :rb
-      raise "not supported yet"
-      @cmds << [args,block]
-    else
-      cmd = Rubish::Command.new(m,args)
-      @cmds << cmd
-      return cmd
-    end
-  end
-
   def exec_with(pipe_in,pipe_out,pipe_err)
     @cmds.each do |cmd|
+      cmd.normalize_args!
       if cmd.i || cmd.o || cmd.err
         raise "It's weird to redirect stdioe for command in a pipeline. Don't."
       end

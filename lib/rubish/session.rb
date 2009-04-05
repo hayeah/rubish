@@ -1,37 +1,7 @@
-
+# There should be only one active session per rubish process
+# Session controls over a number of workspaces (which are just evaluation contexts)
+# Session has a single job_control over all the workspaces.
 class Rubish::Session
-
-  class << self
-    def session(&block)
-      raise "no session" unless @session
-      if block
-        @session.instance_eval &block
-      else
-        @session
-      end
-    end
-
-    # TODO: uhhh... bad abstraction. remove this when i
-    # figure out something better
-    def begin(&block)
-      begin
-        s = Rubish::Session.new
-        @session = s
-        r = s.begin &block
-        s.waitall
-        return r
-      ensure
-        @session = nil
-      end
-    end
-
-    def repl
-      begin
-        @session = Rubish::Session.new
-        @session.repl
-      end
-    end
-  end
 
   module JobControl
     def wait(*jobs)
@@ -61,51 +31,50 @@ class Rubish::Session
     end
   end
 
-  module Base
+  include JobControl
+  
+  class << self
+
     include JobControl
-    
-    def cd(dir,&block)
+
+    def new_session
+      @session.exit if @session
+      @session = Rubish::Session.new
+    end
+
+    def session(&block)
+      raise "no active session" unless @session
       if block
-        begin
-          old_dir = FileUtils.pwd
-          FileUtils.cd File.expand_path(dir)
-          # hmmm.. calling instance_eval has weird effects, dunno why
-          #self.instance_eval &block
-          return block.call
-        ensure
-          FileUtils.cd old_dir
-        end
+        @session.instance_eval &block
       else
-        FileUtils.cd File.expand_path(dir)
+        @session
       end
     end
 
-    def cmd(method,*args)
-      Rubish::Command.new(method,args)
+    def repl
+      self.new_session.repl
     end
 
-    def p(&block)
-      Rubish::Pipe.new &block
+    def eval(__string=nil,&block)
+      self.new_session.current_workspace.eval(__string,&block)
     end
-
-#     def awk
-#       Rubish::Awk.new
-#     end
   end
 
-  include Base
   attr_reader :job_control
-
+  attr_reader :root_workspace
+  attr_reader :current_workspace
+  
   def initialize
-    @vars = {}
     @scanner = RubyLex.new
     @job_control = Rubish::JobControl.new
+    @root_workspace = Rubish::Workspace.new
+    @current_workspace = @root_workspace
   end
 
-  def repl
+  def repl(workspace=@root_workspace)
     raise "$stdin is not a tty device" unless $stdin.tty?
     raise "readline is not available??" unless defined?(IRB::ReadlineInputMethod)
-    __rl = IRB::ReadlineInputMethod.new
+    rl = IRB::ReadlineInputMethod.new
 
     @scanner.set_prompt do |ltype, indent, continue, line_no|
       # ltype is Delimiter type. In strings that are continued across a line break, %l will display the type of delimiter used to begin the string, so you'll know how to end it. The delimiter will be one of ", ', /, ], or `.
@@ -117,65 +86,29 @@ class Rubish::Session
       if indent
         p << " " * indent
       end
-      __rl.prompt = p
+      rl.prompt = p
     end
     
-    @scanner.set_input(__rl)
+    @scanner.set_input(rl)
 
-    # create the evaluative context
-    # TODO abstract this as workspace?
-    __mu = Rubish::Mu.new(Base) do |method,args,block|
-      Rubish::Command.new(method,args)
-    end
-    
-    @scanner.each_top_level_statement do |__line,__line_no|
+    @scanner.each_top_level_statement do |line,line_no|
       begin
-        # don't ever try to do anything with mu except Mu#__instance_eval
-        __r = __mu.__instance_eval(__line)
-        self.submit(__r)
-      rescue StandardError, ScriptError => __e
-        puts __e
-        puts __e.backtrace
+        r = workspace.eval(line)
+        if r.is_a?(Rubish::Executable)
+          r.exec
+          #     elsif r.is_a?(Rubish::Evaluable)
+        elsif r != Rubish::Null
+          pp r
+        end
+      rescue StandardError, ScriptError => e
+        puts e
+        puts e.backtrace
       end
     end
   end
 
-
-  module ScriptBase
-    include Base
-
-    def exec(*exes)
-      __exec(:exec,exes)
-    end
-
-    def exec!(*exes)
-      __exec(:exec!,exes)
-    end
-
-    private
-
-    def __exec(exec_method,exes)
-      exes.each do |exe|
-        raise "not an exeuctable: #{exe}" unless exe.is_a?(Rubish::Executable)
-        exe.send(exec_method)
-      end
-    end
+  def exit
+    waitall
   end
-  
-  def begin(&block)
-    Rubish::Mu.new(ScriptBase) do |method,args,block|
-      Rubish::Command.new(method,args)
-    end.__instance_eval &block
-  end
-
-  def submit(r)
-    if r.is_a?(Rubish::Executable)
-      r.exec
-#     elsif r.is_a?(Rubish::Evaluable)
-#       submit(r.eval)
-    elsif r != Rubish::Null
-      pp r
-    end
-  end
-  
+    
 end

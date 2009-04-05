@@ -62,8 +62,6 @@ class Rubish::Command < Rubish::Executable
     @args = [arg]
     self
   end
-  
-  private
 
   def normalize_args!(args=@args)
     args.map! do |arg|
