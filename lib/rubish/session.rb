@@ -109,12 +109,9 @@ class Rubish::Session
 
     # create the evaluative context
     # TODO abstract this as workspace?
-    __mu = Rubish::Mu.new do |method,args,block|
-      # block's not actually used
-      raise "command builder doesn't take a block" unless block.nil?
+    __mu = Rubish::Mu.new(Base) do |method,args,block|
       Rubish::Command.new(method,args)
     end
-    __mu.__extend Rubish::Session::Base
     
     @scanner.each_top_level_statement do |__line,__line_no|
       begin
@@ -151,11 +148,9 @@ class Rubish::Session
   end
   
   def begin(&block)
-    __mu = Rubish::Mu.new do |method,args,block|
+    Rubish::Mu.new(ScriptBase) do |method,args,block|
       Rubish::Command.new(method,args)
-    end
-    __mu.__extend ScriptBase
-    __mu.__instance_eval &block
+    end.__instance_eval &block
   end
 
   def submit(r)
@@ -167,18 +162,5 @@ class Rubish::Session
       pp r
     end
   end
-
   
-
-  def read
-    line = Readline.readline('rbh> ')
-    Readline::HISTORY.push(line) if !line.empty?
-    line
-  end
-
-  def history
-  end
-
-  alias_method :h, :history
-
 end

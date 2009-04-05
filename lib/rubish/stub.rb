@@ -89,16 +89,7 @@ end
 # for the Mu object). It catches all method calls with method_missing.
 # It is All and Nothing.
 class Rubish::Mu
-  class << self
-    def singleton(*modules)
-      mu = self.new
-      modules.each do |mod|
-        mu.__extend(mod)
-      end
-      mu
-    end
-  end
-
+  
   self.public_instance_methods.each do |m|
     if m[0..1] != "__"
       self.send(:alias_method,"__#{m}",m)
@@ -106,8 +97,11 @@ class Rubish::Mu
     end
   end
 
-  def initialize(&block)
+  def initialize(*modules,&block)
     @missing_method_handler = block
+    modules.each do |mod|
+      self.__extend(mod)
+    end
   end
 
   def method_missing(method,*args,&block)
