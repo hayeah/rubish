@@ -3,10 +3,25 @@ class Rubish::Session
 
   class << self
     def session(&block)
+      raise "no session" unless @session
       if block
         @session.instance_eval &block
       else
         @session
+      end
+    end
+
+    # TODO: uhhh... bad abstraction. remove this when i
+    # figure out something better
+    def begin(&block)
+      begin
+        s = Rubish::Session.new
+        @session = s
+        r = s.begin &block
+        s.waitall
+        return r
+      ensure
+        @session = nil
       end
     end
 
@@ -72,14 +87,6 @@ class Rubish::Session
 #     end
   end
 
-  # calling private method also goes here
-  def mu_handler(m,args,block)
-    # block's not actually used
-    raise "command builder doesn't take a block" unless block.nil?
-    m = m.to_s
-    Rubish::Command.new(m,args)
-  end
-
   def repl
     raise "$stdin is not a tty device" unless $stdin.tty?
     raise "readline is not available??" unless defined?(IRB::ReadlineInputMethod)
@@ -100,8 +107,15 @@ class Rubish::Session
     
     @scanner.set_input(__rl)
 
-    __mu = Rubish::Mu.new &(self.method(:mu_handler).to_proc)
+    # create the evaluative context
+    # TODO abstract this as workspace?
+    __mu = Rubish::Mu.new do |method,args,block|
+      # block's not actually used
+      raise "command builder doesn't take a block" unless block.nil?
+      Rubish::Command.new(method,args)
+    end
     __mu.__extend Rubish::Session::Base
+    
     @scanner.each_top_level_statement do |__line,__line_no|
       begin
         # don't ever try to do anything with mu except Mu#__instance_eval
@@ -112,6 +126,36 @@ class Rubish::Session
         puts __e.backtrace
       end
     end
+  end
+
+
+  module ScriptBase
+    include Base
+
+    def exec(*exes)
+      __exec(:exec,exes)
+    end
+
+    def exec!(*exes)
+      __exec(:exec!,exes)
+    end
+
+    private
+
+    def __exec(exec_method,exes)
+      exes.each do |exe|
+        raise "not an exeuctable: #{exe}" unless exe.is_a?(Rubish::Executable)
+        exe.send(exec_method)
+      end
+    end
+  end
+  
+  def begin(&block)
+    __mu = Rubish::Mu.new do |method,args,block|
+      Rubish::Command.new(method,args)
+    end
+    __mu.__extend ScriptBase
+    __mu.__instance_eval &block
   end
 
   def submit(r)

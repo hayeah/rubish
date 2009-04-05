@@ -50,6 +50,7 @@ class Rubish::JobControl
     return *rss
   end
 
+  # TODO handle interrupt
   def waitall(&block)
     wait(*jobs.values,&block)
   end

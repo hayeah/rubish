@@ -13,6 +13,10 @@ module Rubish
       Rubish::Session.session
     end
 
+    def begin(&block)
+      Rubish::Session.begin(&block)
+    end
+
     def reload
       (%w{
 rubish/stub
