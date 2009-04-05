@@ -137,6 +137,14 @@ class Rubish::Executable
 
   end
 
+  attr_reader :working_directory
+
+  # only changes working directory for this executable
+  def cd(dir)
+    @working_directory = dir
+    self
+  end
+
 #   def awk(address=nil,&block)
 #     if block
 #       Rubish::Awk.new(self).act(&block)
@@ -155,7 +163,13 @@ class Rubish::Executable
 #   end
   
   def exec!
-    Job.start(self)
+    if self.working_directory
+      Rubish.session.cd(self.working_directory) do
+        Job.start(self)
+      end
+    else
+      Job.start(self)
+    end
   end
 
   # TODO catch interrupt here

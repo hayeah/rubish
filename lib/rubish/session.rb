@@ -61,21 +61,27 @@ class Rubish::Session
     end
   end
 
-  include JobControl
-  attr_reader :job_control
-
-  def initialize
-    @vars = {}
-    @scanner = RubyLex.new
-    @job_control = Rubish::JobControl.new
-  end
-
-  
   module Base
     include JobControl
     
-    def cd(dir)
-      FileUtils.cd File.expand_path(dir)
+    def cd(dir,&block)
+      if block
+        begin
+          old_dir = FileUtils.pwd
+          FileUtils.cd File.expand_path(dir)
+          # hmmm.. calling instance_eval has weird effects, dunno why
+          #self.instance_eval &block
+          return block.call
+        ensure
+          FileUtils.cd old_dir
+        end
+      else
+        FileUtils.cd File.expand_path(dir)
+      end
+    end
+
+    def cmd(method,*args)
+      Rubish::Command.new(method,args)
     end
 
     def p(&block)
@@ -85,6 +91,15 @@ class Rubish::Session
 #     def awk
 #       Rubish::Awk.new
 #     end
+  end
+
+  include Base
+  attr_reader :job_control
+
+  def initialize
+    @vars = {}
+    @scanner = RubyLex.new
+    @job_control = Rubish::JobControl.new
   end
 
   def repl
