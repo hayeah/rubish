@@ -207,11 +207,11 @@ class Rubish::Executable
     self
   end
 
-  def each!(&block)
+  def each!
     self.o do |pipe|
       pipe.each_line do |line|
         line.chomp!
-        block.call(line)
+        yield(line)
       end
     end
     job = self.exec!
@@ -237,5 +237,39 @@ class Rubish::Executable
     job.wait
     return acc
   end
+
+  def head(n=1,&block)
+    raise "n should be greater than 0: #{n}" unless n > 0
+    self.map do |l|
+      if n == 0
+        break
+      else
+        n -= 1
+        block ? block.call(l) : l
+      end
+    end
+  end
+
+  def tail(n=1,&block)
+    raise "n should be greater than 0: #{n}" unless n > 0
+    acc = []
+    self.each do |l|
+      acc << (block ? block.call(l) : l)
+      if acc.size > n
+        acc.shift
+      end
+    end
+    return acc
+  end
+
+  def first
+    head(1).first
+  end
+
+  def last
+    tail(1).first
+  end
+
+  
   
 end
