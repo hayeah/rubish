@@ -42,8 +42,8 @@ class Rubish::Session
       job_control.waitall
     end
 
-    def kill(job)
-      job_control.kill(job)
+    def stop(job)
+      job_control.stop(job)
     end
 
     def jobs

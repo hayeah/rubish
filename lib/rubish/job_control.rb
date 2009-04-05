@@ -55,15 +55,15 @@ class Rubish::JobControl
     wait(*jobs.values,&block)
   end
 
-  def kill(job,sig="TERM")
+  def stop(job,sig="TERM")
     job.pids.each do |pid|
       Process.kill(sig,pid)
     end
     wait(job)
   end
 
-  def kill!(job)
-    kill(job,"KILL")
+  def stop!(job)
+    stop(job,"KILL")
   end
 
   private

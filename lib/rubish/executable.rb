@@ -64,8 +64,8 @@ class Rubish::Executable
       return r
     end
 
-    def kill
-      Rubish.session.job_control.kill(self)
+    def stop
+      Rubish.session.job_control.stop(self)
     end
 
     def cleanup
