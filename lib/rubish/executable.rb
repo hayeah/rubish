@@ -96,9 +96,6 @@ class Rubish::Executable
           path = File.expand_path(io)
           raise "path is a directory" if File.directory?(path)
           [File.new(path,mode), true, nil]
-        when Integer
-          fd = io
-          [IO.new(fd,mode), false,nil]
         when IO
           [io, false,nil] 
         when Proc
