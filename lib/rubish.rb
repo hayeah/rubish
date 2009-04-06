@@ -8,6 +8,7 @@ require 'irb/input-method'
 require 'irb/ruby-lex'
 
 require 'rubish/stub'
+require 'rubish/job'
 require 'rubish/job_control'
 require 'rubish/session'
 require 'rubish/workspace'

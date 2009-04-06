@@ -24,6 +24,7 @@ module Rubish
     def reload
       (%w{
 rubish/stub
+rubish/job
 rubish/job_control
 rubish/session
 rubish/workspace

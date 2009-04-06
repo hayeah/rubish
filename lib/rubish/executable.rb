@@ -2,7 +2,7 @@ class Rubish::Executable
 
   # encapsulates the context of an executing job.
   # handles cleanup
-  class Job < Rubish::JobControl::Job
+  class Job < Rubish::Job
     
     class << self
       def start(exe)
