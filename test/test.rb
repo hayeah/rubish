@@ -10,6 +10,22 @@ require 'test/unit'
 gem 'thoughtbot-shoulda'
 require 'shoulda'
 
+require 'set'
+  
+if ARGV.first == "dev"
+  TUT_ = Test::Unit::TestCase
+  # create a dummy empty case to disable all tests
+  # except the one we are developing
+  class TUT
+    def self.should(*args,&block)
+      nil
+    end
+  end
+else
+  TUT = Test::Unit::TestCase
+end
+
+
 TEST_DIR = File.expand_path(File.dirname(__FILE__)) + "/tmp"
 
 Rubish.new_session
@@ -26,7 +42,19 @@ end
 
 setup_tmp
 
-TUT = Test::Unit::TestCase
+module IOHelper
+  class << self
+    def created_ios
+      set1 = Set.new
+      set2 = Set.new
+      ObjectSpace.each_object(IO) { |o| set1 << o }
+      yield
+      ObjectSpace.each_object(IO) { |o| set2 << o }
+      set2 - set1
+    end
+  end
+end
+
 class Rubish::Test < TUT
 
   def setup
@@ -60,16 +88,6 @@ class Rubish::Test::Executable < TUT
   def setup
     setup_tmp
   end
-
-
-#   module Helper
-#     class << self
-#       def make_sure_no_new_io
-        
-#         yield
-#       end
-#     end
-#   end
   
   context "io" do
     should "chomp lines for each/map" do
@@ -95,6 +113,49 @@ class Rubish::Test::Executable < TUT
         assert_equal ints, cat.i("output").map
         assert_equal ints, p { cat; cat; cat}.i("output").map
         assert_equal ints, cat.i { |p| p.puts(ints) }.map
+      }
+    end
+
+    should "close pipes used for io redirects" do
+      WS.eval {
+        ios = IOHelper.created_ios do
+          cat.i { |p| p.puts "foobar" }.o { |p| p.readlines }.exec
+        end
+        assert ios.all? { |io| io.closed? }
+        ios = IOHelper.created_ios do
+          cat.i { |p| p.puts "foobar" }.o("output").exec
+        end
+        assert ios.all? { |io| io.closed? }
+      }
+    end
+
+    should "not close stdioe" do
+      WS.eval {
+        assert_not $stdin.closed?
+        assert_not $stdout.closed?
+        assert_not $stderr.closed?
+        ios = IOHelper.created_ios do
+          ls.exec
+        end
+        assert ios.empty?
+        assert_not $stdin.closed?
+        assert_not $stdout.closed?
+        assert_not $stderr.closed?
+      }
+    end
+    
+    should "not close io if redirecting to existing IO object" do
+      WS.eval {
+        begin
+          f = File.open("/dev/null","w")
+          ios = IOHelper.created_ios do
+            ls.o(f).exec
+          end
+          assert ios.empty?
+          assert_not f.closed?
+        ensure
+          f.close
+        end
       }
     end
     
@@ -183,7 +244,7 @@ class Rubish::Test::JobControl < TUT
     WS.eval {
       slow = Helper.slowcat(3)
       puts
-      puts "slowcat 1 lines"
+      puts "slowcat 3 lines"
       t = Helper.time_elapsed { slow.exec }
       assert_in_delta 3, t, 1
       assert jobs.empty?
