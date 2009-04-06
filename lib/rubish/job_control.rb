@@ -14,6 +14,8 @@ class Rubish::JobControl
       @ticket = @@ticket
       @pids = pids
       @exit_statuses = nil # JobControl will set this field in #wait
+      # add job to the job_control of the active session
+      Rubish::Session.job_control.started(self)
     end
 
     def ok?

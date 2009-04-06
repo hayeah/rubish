@@ -51,6 +51,7 @@ class Rubish::Executable
       e = prepare_io(exe.err || $stderr,"w")
       @ios = [i,o,e]
       pids = exe.exec_with(i.io,o.io,e.io)
+      # this job will be registered to the JobControl by the super initializer
       super(pids)
     end
     
