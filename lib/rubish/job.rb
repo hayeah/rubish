@@ -3,22 +3,25 @@
 class Rubish::Job
 
   attr_accessor :result
-  
-  def initialize
+
+  # subclass initializer MUST call super
+  def initialize(*args)
     @result = nil
+    @done = false
   end
 
   def stop
     raise "abstract"
   end
 
-  # must set result to non-nil after wait
+  # must set @done to true after wait
   def wait
     raise "abstract"
   end
 
-  def active?
-    result.nil?
+  def done?
+    raise "job subclass implementation error" if @done.nil?
+    @done
   end
   
 end

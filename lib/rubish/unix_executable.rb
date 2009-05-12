@@ -4,6 +4,7 @@ class Rubish::UnixExecutable < Rubish::Executable
     attr_reader :pids
 
     def initialize(exe)
+      super
       # prepare_io returns an instance of ExeIO
       i = EIO.prepare_io(exe.i || $stdin,"r")
       o = EIO.prepare_io(exe.o || $stdout,"w")
@@ -13,11 +14,12 @@ class Rubish::UnixExecutable < Rubish::Executable
     end
 
     def wait
-      statuses = self.pids.map do |pid|
+      raise Rubish::Error.new("already waited") if self.done?
+      @result = self.pids.map do |pid|
         Process.wait(pid)
         $?
       end
-      @result = !(statuses.any? {  |status| !(status.exitstatus == 0) }) 
+      @done = true
       @ios.each do |io|
         io.close
       end
@@ -31,8 +33,12 @@ class Rubish::UnixExecutable < Rubish::Executable
       self.wait
     end
 
-    def stop!(job)
+    def stop!
       self.stop("KILL")
+    end
+
+    def ok?
+      done? && !@result.any? {|status| !(status.exitstatus == 0)}
     end
 
   end

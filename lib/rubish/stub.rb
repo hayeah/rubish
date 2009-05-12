@@ -3,6 +3,9 @@ module Rubish
   # magic singleton value to supress shell output.
   module Null
   end
+
+  class Error < RuntimeError
+  end
   
   class << self
     def repl

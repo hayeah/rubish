@@ -190,6 +190,7 @@ class Rubish::Executable
   
   # acc is the accumulator passed in by reference, and updated destructively.
   def map!(acc,&block)
+    acc = Array.new unless acc
     job = self.each! do |l|
       acc << (block.nil? ? l : block.call(l))
     end

@@ -6,7 +6,9 @@
 
 require File.dirname(__FILE__) + '/../lib/rubish'
 require 'rubygems'
+require 'pp'
 require 'test/unit'
+require 'thread'
 gem 'thoughtbot-shoulda'
 require 'shoulda'
 
@@ -18,6 +20,10 @@ if ARGV.first == "dev"
   # except the one we are developing
   class TUT
     def self.should(*args,&block)
+      nil
+    end
+
+    def self.context(*args,&block)
       nil
     end
   end
@@ -161,7 +167,6 @@ class Rubish::Test::Executable < TUT
     
   end
   
-    
   should "head,first/tail,last" do
     WS.eval {
       ls_in_order = p { ls; sort :n }
@@ -203,7 +208,7 @@ class Rubish::Test::Executable < TUT
   
 end
 
-class Rubish::Test::JobControl < TUT
+class Rubish::Test::UnixJob < TUT
   
   def setup
     setup_tmp
@@ -225,51 +230,127 @@ class Rubish::Test::JobControl < TUT
       end
     end
   end
-  
-  should "add to job control" do
+
+  should "set result to array of exit statuses" do
     WS.eval {
-      slow = Helper.slowcat(1).o "/dev/null"
-      job1 = slow.exec!
-      job2 = slow.exec!
-      assert_kind_of Rubish::Job, job1
-      assert_kind_of Rubish::Job, job2
-      assert_equal 2, jobs.values.size
-      waitall
-      assert_equal 0, jobs.values.size
-    }
-  end
-  
-  # we'll do a bunch of timing tests to see if parallelism is working
-  should "wait" do
-    WS.eval {
-      slow = Helper.slowcat(3)
-      puts
-      puts "slowcat 3 lines"
-      t = Helper.time_elapsed { slow.exec }
-      assert_in_delta 3, t, 1
-      assert jobs.empty?
-      slow = Helper.slowcat(2)
-      puts "slowcat 2 * 3 lines in sequence"
-      t = Helper.time_elapsed { slow.exec; slow.exec; slow.exec }
-      assert_in_delta 6, t, 1
-      assert jobs.empty?
+      ls.exec.result.each { |status|
+        assert_instance_of Process::Status, status
+        assert_equal 0, status.exitstatus
+      }
     }
   end
 
-  should "not wait" do
-    WS.eval {
-      slow = Helper.slowcat(3)
-      puts
-      puts "slowcat 3 * 4 lines in parallel"
-      t = Helper.time_elapsed { slow.exec! ; slow.exec!; slow.exec!; slow.exec! }
-      # should not wait
-      assert_in_delta 0, t, 0.5
-      assert_equal 4, jobs.values.size
-      ## the above jobs should finish more or less within 3 to 6 seconds
-      t = Helper.time_elapsed { waitall }
-      assert_in_delta 3, t, 1
-      assert_equal 0, jobs.values.size
+  should "map in parrallel to different array" do
+    slow = Helper.slowcat(1)
+    a1, a2, a3 = [[],[],[]]
+    j1 = slow.map! a1
+    j2 = slow.map! a2
+    j3 = slow.map! a3
+    js = [j1,j2,j3]
+    t = Helper.time_elapsed {
+      js.each { |j| j.wait }
+    }
+    assert_in_delta 1, t, 0.1
+    assert j1.ok? && j2.ok? && j3.ok?
+    rs = [a1,a2,a3]
+    # each result should be an array of sized 3
+    assert(rs.all? { |r| r.size == 1 })
+    # should be accumulated into different arrays
+    assert_equal(3,rs.map{|r| r.object_id }.uniq.size)
+  end
+
+  should "map in parrallel to thread safe queue" do
+    slow = Helper.slowcat(1)
+    acc = Queue.new
+    j1 = slow.map! acc
+    j2 = slow.map! acc
+    j3 = slow.map! acc
+    js = [j1,j2,j3]
+    t = Helper.time_elapsed {
+      j1.wait; j2.wait; j3.wait
+    }
+    assert_in_delta 1, t, 0.1
+    assert j1.ok? && j2.ok? && j3.ok?
+    # each result should be an array of sized 3
+    assert_equal 3, acc.size
+  end
+
+  should "wait for job" do
+    job = Helper.slowcat(1).exec!
+    assert_equal false, job.done?
+    assert_equal false, job.ok?
+    t = Helper.time_elapsed { job.wait }
+    assert_in_delta 0.1, t, 1
+    assert_equal true, job.done?
+    assert_equal true, job.ok?
+  end
+  
+  should "raise when waited twice" do
+    assert_raise(Rubish::Error) {
+      WS.eval { ls.exec.wait }
+    }
+    assert_raise(Rubish::Error) {
+      WS.eval { ls.exec!.wait.wait }
     }
   end
+
+  should "kill a job" do
+    acc = []
+    t = Helper.time_elapsed {
+      job = Helper.slowcat(10).map!(acc)
+      sleep(2)
+      job.stop!
+    }
+    assert_in_delta 2, acc.size, 1, "expects to get roughly two lines out before killing process"
+    assert_in_delta 2, t, 0.1
+    
+  end
+
+    
+  # should "add to job control" do
+#     WS.eval {
+#       slow = Helper.slowcat(1).o "/dev/null"
+#       job1 = slow.exec!
+#       job2 = slow.exec!
+#       assert_kind_of Rubish::Job, job1
+#       assert_kind_of Rubish::Job, job2
+#       assert_equal 2, jobs.values.size
+#       waitall
+#       assert_equal 0, jobs.values.size
+#     }
+#   end
+  
+#   # we'll do a bunch of timing tests to see if parallelism is working
+#   should "wait" do
+#     WS.eval {
+#       slow = Helper.slowcat(3)
+#       puts
+#       puts "slowcat 3 lines"
+#       t = Helper.time_elapsed { slow.exec }
+#       assert_in_delta 3, t, 1
+#       assert jobs.empty?
+#       slow = Helper.slowcat(2)
+#       puts "slowcat 2 * 3 lines in sequence"
+#       t = Helper.time_elapsed { slow.exec; slow.exec; slow.exec }
+#       assert_in_delta 6, t, 1
+#       assert jobs.empty?
+#     }
+#   end
+
+#   should "not wait" do
+#     WS.eval {
+#       slow = Helper.slowcat(3)
+#       puts
+#       puts "slowcat 3 * 4 lines in parallel"
+#       t = Helper.time_elapsed { slow.exec! ; slow.exec!; slow.exec!; slow.exec! }
+#       # should not wait
+#       assert_in_delta 0, t, 0.5
+#       assert_equal 4, jobs.values.size
+#       ## the above jobs should finish more or less within 3 to 6 seconds
+#       t = Helper.time_elapsed { waitall }
+#       assert_in_delta 3, t, 1
+#       assert_equal 0, jobs.values.size
+#     }
+#   end
   
 end
