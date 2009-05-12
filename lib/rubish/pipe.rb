@@ -1,5 +1,5 @@
 
-class Rubish::Pipe < Rubish::Executable
+class Rubish::Pipe < Rubish::UnixExecutable
   attr_reader :cmds
   
   def initialize(workspace,&block)

@@ -1,5 +1,5 @@
 
-class Rubish::Command < Rubish::Executable
+class Rubish::Command < Rubish::UnixExecutable
   
   attr_reader :cmd, :args
   attr_reader :quoted # if true, arguments for exec are not shell expanded.

@@ -1,20 +1,24 @@
+
+# a job is not necessarily registered with job control.
 class Rubish::Job
-  attr_reader :pids
-  attr_accessor :exit_statuses
-  attr_reader :ticket
+
+  attr_accessor :result
   
-  def initialize(pids)
-    @@ticket ||= 0
-    @@ticket += 1
-    @ticket = @@ticket
-    @pids = pids
-    @exit_statuses = nil # JobControl will set this field in #wait
-    # add job to the job_control of the active session
-    Rubish::Session.job_control.started(self)
+  def initialize
+    @result = nil
   end
 
-  def ok?
-    not exit_statuses.any? {  |status| !(status.exitstatus == 0) }
+  def stop
+    raise "abstract"
+  end
+
+  # must set result to non-nil after wait
+  def wait
+    raise "abstract"
+  end
+
+  def active?
+    result.nil?
   end
   
 end

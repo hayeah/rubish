@@ -1,140 +1,99 @@
 class Rubish::Executable
 
-  # encapsulates the context of an executing job.
-  # handles cleanup
-  class Job < Rubish::Job
-    
+  class ExecutableIO
     class << self
-      def start(exe)
-        self.new(exe)
-      end
-    end
-
-    class JobIO
-      attr_reader :thread
-      attr_reader :io
-      attr_reader :auto_close
-      
-      def initialize(io,auto_close,thread)
-        @io = io
-        @auto_close = auto_close
-        @thread = thread
-      end
-
-      def close
-        if auto_close
-          io.close
-        else
-          #io.flush if io.stat.writable?
-          #io.flush rescue true # try flushing
-        end
-        
-        if thread
-          begin
-            thread.join
-          ensure
-            if thread.alive?
-              thread.kill
+      # sorry, this is pretty hairy. This method
+      # instructs how exec should handle IO. (whether
+      # IO is done in a thread. whether it needs to be
+      # closed. (so on))
+      #
+      # an io could be
+      # String: interpreted as file name
+      # Number: file descriptor
+      # IO: Ruby IO object
+      # Block: executed in a thread, and a pipe connects the executable and the thread.
+      def prepare_io(io,mode)
+        # if the io given is a block, we execute it in a thread (passing it a pipe)
+        raise "invalid io mode: #{mode}" unless mode == "w" || mode == "r"
+        result =
+          case io
+          when $stdin, $stdout, $stderr
+            [io, false, nil]
+          when String
+            path = File.expand_path(io)
+            raise "path is a directory" if File.directory?(path)
+            [File.new(path,mode), true, nil]
+          when IO
+            [io, false,nil] 
+          when Proc
+            proc = io
+            r,w = IO.pipe
+            # if we want to use a block to
+            # (1) input into executable
+            #   - return "r" end from prepare_io, and
+            #   the executable use this and standard
+            #   input.
+            #   - let the thread block writes to the "w" end
+            # (2) read from executable
+            #   - return "w" from prepare_io
+            #   - let thread reads from "r"
+            return_io, thread_io =
+              case mode
+                # case 1
+              when "r"
+                [r,w]
+              when "w"
+                # case 2
+                [w,r]
+              end
+            thread = Thread.new do
+            begin
+              proc.call(thread_io)
+            ensure
+              thread_io.close
             end
           end
-        end
+            [return_io, true, thread]
+          else
+            raise "not a valid input: #{io}"
+          end
+        return self.new(*result)
       end
+
     end
 
-    attr_accessor :exitstatus
-    attr_accessor :ios
+    attr_reader :thread
+    attr_reader :io
+    attr_reader :auto_close
     
-    def initialize(exe)
-      # prepare_io returns an instance of JobIO
-      i = prepare_io(exe.i || $stdin,"r")
-      o = prepare_io(exe.o || $stdout,"w")
-      e = prepare_io(exe.err || $stderr,"w")
-      @ios = [i,o,e]
-      pids = exe.exec_with(i.io,o.io,e.io)
-      # this job will be registered to the JobControl by the super initializer
-      super(pids)
-    end
-    
-    # threads
-    # ios
-
-    def wait(&block)
-      r = nil
-      Rubish.session.job_control.wait(self)
-      cleanup
-      return r
+    def initialize(io,auto_close,thread)
+      @io = io
+      @auto_close = auto_close
+      @thread = thread
     end
 
-    def stop
-      Rubish.session.job_control.stop(self)
-    end
-
-    def cleanup
-      @ios.each do |io|
+    def close
+      if auto_close
         io.close
+      else
+        #io.flush if io.stat.writable?
+        #io.flush rescue true # try flushing
       end
-    end
-
-    # sorry, this is pretty hairy. This method
-    # instructs how exec should handle IO. (whether
-    # IO is done in a thread. whether it needs to be
-    # closed. (so on))
-    #
-    # an io could be
-    # String: interpreted as file name
-    # Number: file descriptor
-    # IO: Ruby IO object
-    # Block: executed in a thread, and a pipe connects the executable and the thread.
-    def prepare_io(io,mode)
-      # if the io given is a block, we execute it in a thread (passing it a pipe)
-      raise "invalid io mode: #{mode}" unless mode == "w" || mode == "r"
-      result =
-        case io
-        when $stdin, $stdout, $stderr
-          [io, false, nil]
-        when String
-          path = File.expand_path(io)
-          raise "path is a directory" if File.directory?(path)
-          [File.new(path,mode), true, nil]
-        when IO
-          [io, false,nil] 
-        when Proc
-          proc = io
-          r,w = IO.pipe
-          # if we want to use a block to
-          # (1) input into executable
-          #   - return "r" end from prepare_io, and
-          #   the executable use this and standard
-          #   input.
-          #   - let the thread block writes to the "w" end
-          # (2) read from executable
-          #   - return "w" from prepare_io
-          #   - let thread reads from "r"
-          return_io, thread_io =
-            case mode
-              # case 1
-            when "r"
-              [r,w]
-            when "w"
-              # case 2
-              [w,r]
-            end
-          thread = Thread.new do
-          begin
-            proc.call(thread_io)
-          ensure
-            thread_io.close
+      
+      if thread
+        begin
+          thread.join
+        ensure
+          if thread.alive?
+            thread.kill
           end
         end
-          [return_io, true, thread]
-        else
-          raise "not a valid input: #{io}"
-        end
-      return JobIO.new(*result)
+      end
     end
-
   end
 
+  
+  
   attr_reader :working_directory
 
   # only changes working directory for this executable
@@ -160,23 +119,31 @@ class Rubish::Executable
 #     end
 #   end
   
-  def exec!
-    if self.working_directory
-      Rubish.session.cd(self.working_directory) do
-        Job.start(self)
-      end
-    else
-      Job.start(self)
-    end
-  end
+  # def exec!
+#     if self.working_directory
+#       Rubish.session.cd(self.working_directory) do
+#         Job.start(self)
+#       end
+#     else
+#       Job.start(self)
+#     end
+#   end
 
-  # TODO catch interrupt here
+#   # TODO catch interrupt here
+#   def exec
+#     job = exec!
+#     job.wait
+#     job
+#   end
+
   def exec
-    job = exec!
-    job.wait
-    job
+    raise "abstract"
   end
 
+  def exec!
+    raise "abstract"
+  end
+  
   def exec_with(i,o,e)
     raise "abstract"
   end
