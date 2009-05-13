@@ -2,6 +2,19 @@ class Rubish::Executable
 
   class ExecutableIO
     class << self
+      def i(i=nil)
+        prepare_io(i || Rubish::Context.current.i,"r")
+      end
+
+      def o(o=nil)
+        prepare_io(o || Rubish::Context.current.o,"w")
+      end
+
+      def err(e=nil)
+        prepare_io(e || Rubish::Context.current.e,"w")
+      end
+      
+      private
       # sorry, this is pretty hairy. This method
       # instructs how exec should handle IO. (whether
       # IO is done in a thread. whether it needs to be

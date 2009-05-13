@@ -6,9 +6,9 @@ class Rubish::UnixExecutable < Rubish::Executable
     def initialize(exe)
       super
       # prepare_io returns an instance of ExeIO
-      i = EIO.prepare_io(exe.i || $stdin,"r")
-      o = EIO.prepare_io(exe.o || $stdout,"w")
-      e = EIO.prepare_io(exe.err || $stderr,"w")
+      i = EIO.i(exe.i)
+      o = EIO.o(exe.o)
+      e = EIO.err(exe.err)
       @ios = [i,o,e]
       @pids = exe.exec_with(i.io,o.io,e.io)
     end

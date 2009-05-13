@@ -1,5 +1,14 @@
 class Rubish::Workspace < Rubish::Mu
 
+  class << self
+    # this is the default workspace (used by the singleton context
+    def singleton
+      @singleton ||= Rubish::Workspace.new
+    end
+
+    alias_method :global, :singleton
+  end
+
   module Base
     include Rubish::Session::JobControl
     
@@ -36,6 +45,16 @@ class Rubish::Workspace < Rubish::Mu
       __exec(:exec!,exes)
     end
 
+    # current context on the dynamic context stack
+    def context
+      Rubish::Context.current
+    end
+
+    # TODO should clone a context (as well as workspace)
+    def scope(ws=nil,i=nil,o=nil,e=nil)
+      Rubish::Context.new(current.workspace)
+    end
+
     private
 
     def __exec(exec_method,exes)
@@ -60,6 +79,7 @@ class Rubish::Workspace < Rubish::Mu
     modules.each do |m|
       self.__extend(m)
     end
+    self
   end
 
   def eval(__string=nil,&__block)

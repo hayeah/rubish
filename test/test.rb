@@ -208,6 +208,70 @@ class Rubish::Test::Executable < TUT
   
 end
 
+class Rubish::Test::Context < TUT_
+  def setup
+    setup_tmp
+  end
+
+  module Helper
+    class << self
+      def workspace
+        # a custom workspace extended with two methods and assertions
+        ws = Rubish::Workspace.new.extend Module.new {
+          def foo1
+            1
+          end
+
+          def foo2
+            2
+          end
+        }, Test::Unit::Assertions
+      end
+
+      def context(i=nil,o=nil,e=nil)
+        context = Rubish::Context.new(workspace,i,o,e)
+      end
+    end
+  end
+  
+
+  should "stack contexts" do
+    c1 = Helper.context("c1")
+    c2 = Helper.context("c2")
+    c1.for {
+      # the following "context" is a binding
+      # introduced by the default workspace. It
+      # should point to the current active context.
+      assert_instance_of Rubish::Context, context
+      assert_same Rubish::Context.current, context
+      assert_same c1, context
+      c2.for {
+        assert_same c2, context
+      }
+    }
+  end
+  
+  should "use context specific workspace" do
+    Helper.context.for {
+      assert_equal 1, foo1
+      assert_equal 2, foo2
+      cmd = ls
+      assert_instance_of Rubish::Command, cmd
+    }
+  end
+
+  should "use context specific IO" do
+    output = "output"
+    Helper.context(nil,output,nil).for {
+      
+      assert_equal output, Rubish::Context.current.o
+      cat.i { |p| p.puts 1}.exec
+      assert_equal 1, cat.i("output").first.to_i
+    }
+  end
+  
+end
+
 class Rubish::Test::UnixJob < TUT
   
   def setup
