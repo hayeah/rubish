@@ -35,11 +35,22 @@ end
 TEST_DIR = File.expand_path(File.dirname(__FILE__)) + "/tmp"
 
 Rubish.new_session
+
 WS = Rubish.session.current_workspace
-WS.extend Test::Unit::Assertions
+#WS.extend Test::Unit::Assertions
+
+RSH = Rubish::Context.global.derive
+RSH.workspace.extend(Test::Unit::Assertions)
+def rsh(&block)
+  if block
+    RSH.eval &block
+  else
+    RSH
+  end
+end
 
 def setup_tmp
-  WS.eval {
+  rsh {
     rm(:rf, TEST_DIR).exec if File.exist?(TEST_DIR)
     mkdir(TEST_DIR).exec
     cd TEST_DIR
@@ -68,7 +79,7 @@ class Rubish::Test < TUT
   end
 
   should "not have changed directory" do
-    WS.eval {
+    rsh {
       assert_equal TEST_DIR, pwd.first
       mkdir("dir").exec
       cd "dir" do
@@ -79,7 +90,7 @@ class Rubish::Test < TUT
   end
 
   should "have changed directory" do
-    WS.eval {
+    rsh {
       assert_equal TEST_DIR, pwd.first
       mkdir("dir").exec
       cd "dir"
@@ -100,36 +111,43 @@ class Rubish::Test::Workspace < TUT
   end
 
   should "alias Object#methods" do
-    assert_instance_of Rubish::Command, WS.class
-    # it's somewhat surprising that
-    # assert_instance_of still works. Probably not
-    # using Object#class but case switching.
-    assert_instance_of Rubish::Workspace, WS
-    assert_instance_of Class, WS.__class
+    rsh {
+      ws = current_workspace
+      assert_instance_of Rubish::Command, ws.class
+      # it's somewhat surprising that
+      # assert_instance_of still works. Probably not
+      # using Object#class but case switching.
+      assert_instance_of Rubish::Workspace, ws
+      assert_instance_of Class, ws.__class
 
-    # the magic methods should still be there
-    assert WS.__respond_to?(:__id__)
-    assert WS.__respond_to?(:__send__)
+      # the magic methods should still be there
+      assert ws.__respond_to?(:__id__)
+      assert ws.__respond_to?(:__send__)
 
-    # the magic methods should be aliased as well
-    assert WS.__respond_to?(:____id__)
-    assert WS.__respond_to?(:____send__)
+      # the magic methods should be aliased as well
+      assert ws.__respond_to?(:____id__)
+      assert ws.__respond_to?(:____send__)
+    }
+    
 
   end
 
   should "not introduce bindings to parent workspace" do
-    WS.derive {
-      def foo1
-        1
-      end
-    }.eval {
-      assert_not_equal derived_workspace, WS
-      # the derived workspace should have the
-      # injected binding via its singleton module.
-      derived_workspace = self
-      assert_equal 1, foo1
-      WS.eval {
-        assert_instance_of Rubish::Command, foo1, "the original of derived workspace should not respond to injected bindings"
+    rsh {
+      parent = current_workspace
+      child = parent.derive {
+        def foo
+          1
+        end
+      }
+      child.eval {
+        assert_not_equal parent.__object_id, child.__object_id
+        # the derived workspace should have the
+        # injected binding via its singleton module.
+        assert_equal 1, foo
+        parent.eval {
+          assert_instance_of Rubish::Command, foo, "the original of derived workspace should not respond to injected bindings"
+        }
       }
     }
   end
@@ -141,27 +159,34 @@ class Rubish::Test::Workspace::Base < TUT
   end
 
   should "nest with's" do
-    ws2 = WS.derive {
-      def foo
-        1
-      end
-    }
-    WS.with(WS) {
-      assert_equal Rubish::Context.singleton, context.parent
-      assert_instance_of Rubish::Command, ls
-      c1 = context
-      WS.with(ws2) {
-        assert_equal Rubish::Context.singleton, context.parent.parent
-        assert_equal ws2, context.workspace
+    rsh {
+      c1 = self
+      with {
+        ws2 = self
+        # redefines foo each time this block is executed
+        def foo
+          1
+        end
+        
+        assert_equal c1, context.parent
+        assert_instance_of Rubish::Command, ls
         assert_equal 1, foo
-        with(ws2.derive { def foo;3;end }) {
-          assert_equal 3, foo
-        }
-        with(c1) {
-          assert_equal c1, context.parent
-        }
-      }
-      
+        with {
+          assert_equal c1, context.parent.parent
+          assert_equal ws2, context.workspace
+          assert_equal 1, foo
+          acc = []
+          c2 = with(current_workspace.derive {def foo; 3 end})
+          c2.eval {
+            assert_equal 3, foo
+          }
+          c2.eval {def foo; 33; end}
+          c2.eval {assert_equal 33, foo}
+          
+          with(c1) { # explicitly derive from a specified context
+            assert_equal c1, context.parent, "should derive from given context"
+          }}}
+      assert_instance_of Rubish::Command, foo
     }
   end
   
@@ -174,7 +199,7 @@ class Rubish::Test::Executable < TUT
   
   context "io" do
     should "chomp lines for each/map" do
-      WS.eval {
+      rsh {
         ints = (1..100).to_a.map { |i| i.to_s }
         cat.o("output").i { |p| p.puts(ints)}.exec
         # raw access to pipe would have newlines
@@ -190,7 +215,7 @@ class Rubish::Test::Executable < TUT
     end
     
     should "redirect io" do
-      WS.eval {
+      rsh {
         ints = (1..100).to_a.map { |i| i.to_s }
         cat.o("output").i { |p| p.puts(ints)}.exec
         assert_equal ints, cat.i("output").map
@@ -200,7 +225,7 @@ class Rubish::Test::Executable < TUT
     end
 
     should "close pipes used for io redirects" do
-      WS.eval {
+      rsh {
         ios = IOHelper.created_ios do
           cat.i { |p| p.puts "foobar" }.o { |p| p.readlines }.exec
         end
@@ -213,7 +238,7 @@ class Rubish::Test::Executable < TUT
     end
 
     should "not close stdioe" do
-      WS.eval {
+      rsh {
         assert_not $stdin.closed?
         assert_not $stdout.closed?
         assert_not $stderr.closed?
@@ -228,7 +253,7 @@ class Rubish::Test::Executable < TUT
     end
     
     should "not close io if redirecting to existing IO object" do
-      WS.eval {
+      rsh {
         begin
           f = File.open("/dev/null","w")
           ios = IOHelper.created_ios do
@@ -245,7 +270,7 @@ class Rubish::Test::Executable < TUT
   end
   
   should "head,first/tail,last" do
-    WS.eval {
+    rsh {
       ls_in_order = p { ls; sort :n }
       files = (1..25).to_a.map { |i| i.to_s }
       exec touch(files)
@@ -267,7 +292,7 @@ class Rubish::Test::Executable < TUT
   end
   
   should "quote exec arguments" do
-    WS.eval {
+    rsh {
       files = ["a b","c d"]
       # without quoting
       exec touch(files)
@@ -423,7 +448,7 @@ class Rubish::Test::UnixJob < TUT
       end
 
       def slowcat(n)
-        WS.eval {
+        rsh {
           lines = (1..n).to_a
           ruby("../slowcat.rb").i { |p| p.puts lines }
         }
@@ -432,7 +457,7 @@ class Rubish::Test::UnixJob < TUT
   end
 
   should "set result to array of exit statuses" do
-    WS.eval {
+    rsh {
       ls.exec.result.each { |status|
         assert_instance_of Process::Status, status
         assert_equal 0, status.exitstatus
@@ -487,10 +512,10 @@ class Rubish::Test::UnixJob < TUT
   
   should "raise when waited twice" do
     assert_raise(Rubish::Error) {
-      WS.eval { ls.exec.wait }
+      rsh { ls.exec.wait }
     }
     assert_raise(Rubish::Error) {
-      WS.eval { ls.exec!.wait.wait }
+      rsh { ls.exec!.wait.wait }
     }
   end
 
@@ -508,7 +533,7 @@ class Rubish::Test::UnixJob < TUT
 
     
   # should "add to job control" do
-#     WS.eval {
+#     rsh {
 #       slow = Helper.slowcat(1).o "/dev/null"
 #       job1 = slow.exec!
 #       job2 = slow.exec!
@@ -522,7 +547,7 @@ class Rubish::Test::UnixJob < TUT
   
 #   # we'll do a bunch of timing tests to see if parallelism is working
 #   should "wait" do
-#     WS.eval {
+#     rsh {
 #       slow = Helper.slowcat(3)
 #       puts
 #       puts "slowcat 3 lines"
@@ -538,7 +563,7 @@ class Rubish::Test::UnixJob < TUT
 #   end
 
 #   should "not wait" do
-#     WS.eval {
+#     rsh {
 #       slow = Helper.slowcat(3)
 #       puts
 #       puts "slowcat 3 * 4 lines in parallel"

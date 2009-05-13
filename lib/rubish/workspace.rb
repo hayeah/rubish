@@ -63,10 +63,15 @@ class Rubish::Workspace < Rubish::Mu
       case ws_or_context
       when Rubish::Workspace
         ws = ws_or_context
+        # derive from current context but use a different workspace
         c = current_context.derive(ws,i,o,e)
       when Rubish::Context
         parent = ws_or_context
         c = parent.derive(nil,i,o,e)
+      when nil
+        c = current_context.derive(nil,i,o,e)
+      else
+        raise "can't create scope with: #{ws_or_context}"
       end
       if block
         c.eval &block
@@ -147,8 +152,17 @@ class Rubish::Workspace < Rubish::Mu
     self.__methods.reject { |m| m =~ /^__/ }
   end
 
+  def to_s
+    # self.__inspect
+    "#<#{self.__class}:#{self.__object_id}>"
+  end
+
   def inspect
-    self.__inspect
+    to_s
+  end
+
+  def to_ary
+    [to_s]
   end
   
 end
