@@ -5,6 +5,7 @@ class Rubish::Context
       @singleton ||= self.new(Rubish::Workspace.global,
                               $stdin,$stdout,$stderr)
     end
+    alias_method :global, :singleton
     
     def current
       Thread.current["rubish.context"] || self.singleton
@@ -22,28 +23,47 @@ class Rubish::Context
     end
   end
 
-  attr_accessor :i, :o, :e
+  attr_accessor :i, :o, :err
   attr_accessor :workspace
   attr_reader :pwd # working_directory
   attr_reader :job_control
+  attr_reader :parent
   
-  
-  def initialize(workspace,i=nil,o=nil,e=nil)
+  # prototype style cloning, but only on select attributes
+  def initialize(workspace,i=nil,o=nil,err=nil)
+    # a cloned context inherits the follow attributes
     @workspace = workspace
     @i = i || Rubish::Context.current.i
     @o = o || Rubish::Context.current.o
-    @e = e || Rubish::Context.current.e
+    @err = err || Rubish::Context.current.err
     # @pwd = Dir.pwd
+
+    # not these
+    @job_control = Rubish::JobControl.new
+    @parent = nil
+  end
+
+  def initialize_copy(from)
+    # note that we use the cloned workspace of the parent's workspace.
+    initialize(from.workspace.__clone,
+               from.i, from.o, from.err)
     @job_control = Rubish::JobControl.new
   end
 
-  def with(workspace)
-    raise Rubish::Error.new("expects a workspace") unless workspace.is_a?(Rubish::Workspace)
-    @workspace = workspace
-    self
+  def derive(workspace=nil,i=nil,o=nil,err=nil)
+    parent = self
+    child = parent.clone
+    child.instance_eval {
+      @parent = parent
+      @workspace = workspace if workspace
+      @i = i if i
+      @o = o if o
+      @err = err if err
+    }
+    return child
   end
   
-  def for(&block)
+  def eval(&block)
     Rubish::Context.as_current(self) {
       self.workspace.eval &block
     }

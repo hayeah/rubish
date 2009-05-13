@@ -10,8 +10,8 @@ class Rubish::Executable
         prepare_io(o || Rubish::Context.current.o,"w")
       end
 
-      def err(e=nil)
-        prepare_io(e || Rubish::Context.current.e,"w")
+      def err(err=nil)
+        prepare_io(err || Rubish::Context.current.err,"w")
       end
       
       private

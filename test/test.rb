@@ -90,6 +90,83 @@ class Rubish::Test < TUT
   end
 end
 
+
+class Rubish::Test::Workspace < TUT
+  # Remember that Object#methods of Workspace
+  # instances are aliased with the prefix '__'
+  
+  def setup
+    setup_tmp
+  end
+
+  should "alias Object#methods" do
+    assert_instance_of Rubish::Command, WS.class
+    # it's somewhat surprising that
+    # assert_instance_of still works. Probably not
+    # using Object#class but case switching.
+    assert_instance_of Rubish::Workspace, WS
+    assert_instance_of Class, WS.__class
+
+    # the magic methods should still be there
+    assert WS.__respond_to?(:__id__)
+    assert WS.__respond_to?(:__send__)
+
+    # the magic methods should be aliased as well
+    assert WS.__respond_to?(:____id__)
+    assert WS.__respond_to?(:____send__)
+
+  end
+
+  should "not introduce bindings to parent workspace" do
+    WS.derive {
+      def foo1
+        1
+      end
+    }.eval {
+      assert_not_equal derived_workspace, WS
+      # the derived workspace should have the
+      # injected binding via its singleton module.
+      derived_workspace = self
+      assert_equal 1, foo1
+      WS.eval {
+        assert_instance_of Rubish::Command, foo1, "the original of derived workspace should not respond to injected bindings"
+      }
+    }
+  end
+end
+
+class Rubish::Test::Workspace::Base < TUT
+  def self
+    setup_tmp
+  end
+
+  should "nest with's" do
+    ws2 = WS.derive {
+      def foo
+        1
+      end
+    }
+    WS.with(WS) {
+      assert_equal Rubish::Context.singleton, context.parent
+      assert_instance_of Rubish::Command, ls
+      c1 = context
+      WS.with(ws2) {
+        assert_equal Rubish::Context.singleton, context.parent.parent
+        assert_equal ws2, context.workspace
+        assert_equal 1, foo
+        with(ws2.derive { def foo;3;end }) {
+          assert_equal 3, foo
+        }
+        with(c1) {
+          assert_equal c1, context.parent
+        }
+      }
+      
+    }
+  end
+  
+end
+
 class Rubish::Test::Executable < TUT
   def setup
     setup_tmp
@@ -208,49 +285,6 @@ class Rubish::Test::Executable < TUT
   
 end
 
-class Rubish::Test::Workspace < TUT
-  # Remember that Object#methods of Workspace
-  # instances are aliased with the prefix '__'
-  
-  def setup
-    setup_tmp
-  end
-
-  should "alias Object#methods" do
-    assert_instance_of Rubish::Command, WS.class
-    # it's somewhat surprising that
-    # assert_instance_of still works. Probably not
-    # using Object#class but case switching.
-    assert_instance_of Rubish::Workspace, WS
-    assert_instance_of Class, WS.__class
-
-    # the magic methods should still be there
-    assert WS.__respond_to?(:__id__)
-    assert WS.__respond_to?(:__send__)
-
-    # the magic methods should be aliased as well
-    assert WS.__respond_to?(:____id__)
-    assert WS.__respond_to?(:____send__)
-
-  end
-
-  should "not introduce bindings to parent workspace" do
-    WS.derive {
-      def foo1
-        1
-      end
-    }.eval {
-      assert_not_equal derived_workspace, WS
-      # the derived workspace should have the
-      # injected binding via its singleton module.
-      derived_workspace = self
-      assert_equal 1, foo1
-      WS.eval {
-        assert_instance_of Rubish::Command, foo1, "the original of derived workspace should not respond to injected bindings"
-      }
-    }
-  end
-end
 
 class Rubish::Test::Context < TUT
   def setup
@@ -273,30 +307,34 @@ class Rubish::Test::Context < TUT
       end
 
       def context(i=nil,o=nil,e=nil)
-        context = Rubish::Context.new(workspace,i,o,e)
+        Rubish::Context.singleton.derive(nil,i,o,e)
       end
     end
   end
-  
 
+  
   should "stack contexts" do
-    c1 = Helper.context("c1")
-    c2 = Helper.context("c2")
-    c1.for {
+    c1 = Helper.context(nil,"c1_out")
+    c2 = Helper.context(nil,"c2_out")
+    c1.eval {
       # the following "context" is a binding
       # introduced by the default workspace. It
       # should point to the current active context.
       assert_instance_of Rubish::Context, context
-      assert_same Rubish::Context.current, context
-      assert_same c1, context
-      c2.for {
-        assert_same c2, context
+      assert_equal Rubish::Context.current, context
+      assert_equal Rubish::Context.singleton, context.parent
+      assert_equal c1, context
+      assert_equal "c1_out", context.o
+      c2.eval {
+        assert_equal c2, context
+        assert_equal "c2_out", context.o
+        assert_equal Rubish::Context.singleton, context.parent
       }
     }
   end
   
   should "use context specific workspace" do
-    Helper.context.for {
+    Helper.context.eval {
       assert_equal 1, foo1
       assert_equal 2, foo2
       cmd = ls
@@ -305,14 +343,68 @@ class Rubish::Test::Context < TUT
   end
 
   should "use context specific IO" do
-    output = "output"
-    Helper.context(nil,output,nil).for {
+    output =  "context-output"
+    c = Helper.context(nil,output)
+    c.eval {
       
       assert_equal output, Rubish::Context.current.o
       cat.i { |p| p.puts 1}.exec
-      assert_equal 1, cat.i("output").first.to_i
+      assert_equal 1, cat.i(output).first.to_i
     }
   end
+
+  should "set parent context when deriving" do
+    c1 = Rubish::Context.singleton
+    c11 = c1.derive
+    c111 = c11.derive
+    c12 = c1.derive
+    c2 = Rubish::Context.new(WS)
+
+    puts c1.parent
+    assert_nil c1.parent
+    assert_equal c1, c11.parent
+    assert_equal c1, c12.parent
+    assert_equal c11, c111.parent
+
+    assert_nil c2.parent
+    
+    
+  end
+
+  should "derive context, using the context attributes of the original" do
+    i1 = "i1"
+    o1 = "o1"
+    e1 = "e1"
+    orig = Helper.context(i1, o1, e1)
+    derived = orig.derive
+
+    assert_not_equal orig, derived
+    assert_equal orig.workspace, derived.workspace
+    assert_equal orig.i, derived.i
+    assert_equal orig.o, derived.o
+    assert_equal orig.err, derived.err
+    assert_not_equal orig.job_control, derived.job_control,  "derived context should have its own job control"
+
+    # make changes to the derived context
+    derived.i = "i2"
+    derived.o = "o2"
+    derived.err = "e2"
+
+    derived.workspace = WS.derive {
+      def foo
+        1
+      end
+    }
+    assert_equal 1, derived.eval { foo }
+
+    # orig should not have changed
+    assert_equal i1, orig.i
+    assert_equal o1, orig.o
+    assert_equal e1, orig.err
+    assert_instance_of Rubish::Command, orig.eval { foo }
+    
+  end
+
   
 end
 

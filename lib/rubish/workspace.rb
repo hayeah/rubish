@@ -47,14 +47,34 @@ class Rubish::Workspace < Rubish::Mu
     end
 
     # current context on the dynamic context stack
-    def context
+    def current_context
       Rubish::Context.current
     end
+    alias_method :context, :current_context
 
-    # TODO should clone a context (as well as workspace)
-    def scope(ws=nil,i=nil,o=nil,e=nil)
-      Rubish::Context.new(current.workspace,i,o,e)
+    def current_workspace
+      Rubish::Context.current.workspace
     end
+    alias_method :workspace, :current_workspace
+
+    
+    # TODO should clone a context (as well as workspace)
+    def with(ws_or_context=nil,i=nil,o=nil,e=nil,&block)
+      case ws_or_context
+      when Rubish::Workspace
+        ws = ws_or_context
+        c = current_context.derive(ws,i,o,e)
+      when Rubish::Context
+        parent = ws_or_context
+        c = parent.derive(nil,i,o,e)
+      end
+      if block
+        c.eval &block
+      else
+        c
+      end
+    end
+    alias_method :scope, :with
 
     private
 
@@ -117,6 +137,10 @@ class Rubish::Workspace < Rubish::Mu
     else
       cmd
     end
+  end
+
+  def clone
+    self.__clone
   end
 
   def methods
