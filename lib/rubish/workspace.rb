@@ -11,7 +11,8 @@ class Rubish::Workspace < Rubish::Mu
 
   module Base
     include Rubish::Session::JobControl
-    
+
+    # TODO move this to context?
     def cd(dir,&block)
       if block
         begin
@@ -52,7 +53,7 @@ class Rubish::Workspace < Rubish::Mu
 
     # TODO should clone a context (as well as workspace)
     def scope(ws=nil,i=nil,o=nil,e=nil)
-      Rubish::Context.new(current.workspace)
+      Rubish::Context.new(current.workspace,i,o,e)
     end
 
     private
@@ -69,17 +70,35 @@ class Rubish::Workspace < Rubish::Mu
   include Base
 
   attr_accessor :command_factory_hook
+  
   def initialize
     # @vars = {}
     # this is a hack for pipe... dunno if there's a better way to do it.
     @command_factory_hook = nil
+    @modules = []
   end
 
-  def extend(*modules)
+  def extend(*modules,&block)
+    @modules.concat modules
     modules.each do |m|
       self.__extend(m)
     end
+    # extend with anonymous module
+    if block
+      mod = Module.new(&block)
+      self.__extend mod
+      @modules << mod
+    end
     self
+  end
+
+  # creates a cloned workspace
+  def derive(*modules,&block)
+    # parent_modules = self.modules.dup
+#     new_ws = Rubish::Workspace.new
+#     new_ws.extend(*parent_modules)
+    new_ws = self.__clone
+    new_ws.extend(*modules,&block)
   end
 
   def eval(__string=nil,&__block)
@@ -98,6 +117,10 @@ class Rubish::Workspace < Rubish::Mu
     else
       cmd
     end
+  end
+
+  def methods
+    self.__methods.reject { |m| m =~ /^__/ }
   end
 
   def inspect

@@ -100,8 +100,11 @@ end
 class Rubish::Mu
   
   self.public_instance_methods.each do |m|
+    # for consistency's sake, methods already
+    # underscored should remain be two undscores
+    self.send(:alias_method,"__#{m}",m)
     if m[0..1] != "__"
-      self.send(:alias_method,"__#{m}",m)
+      # don't remove special methods (i.e. __id__, __send__)
       self.send(:undef_method,m)
     end
   end

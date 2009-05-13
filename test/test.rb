@@ -208,7 +208,51 @@ class Rubish::Test::Executable < TUT
   
 end
 
-class Rubish::Test::Context < TUT_
+class Rubish::Test::Workspace < TUT
+  # Remember that Object#methods of Workspace
+  # instances are aliased with the prefix '__'
+  
+  def setup
+    setup_tmp
+  end
+
+  should "alias Object#methods" do
+    assert_instance_of Rubish::Command, WS.class
+    # it's somewhat surprising that
+    # assert_instance_of still works. Probably not
+    # using Object#class but case switching.
+    assert_instance_of Rubish::Workspace, WS
+    assert_instance_of Class, WS.__class
+
+    # the magic methods should still be there
+    assert WS.__respond_to?(:__id__)
+    assert WS.__respond_to?(:__send__)
+
+    # the magic methods should be aliased as well
+    assert WS.__respond_to?(:____id__)
+    assert WS.__respond_to?(:____send__)
+
+  end
+
+  should "not introduce bindings to parent workspace" do
+    WS.derive {
+      def foo1
+        1
+      end
+    }.eval {
+      assert_not_equal derived_workspace, WS
+      # the derived workspace should have the
+      # injected binding via its singleton module.
+      derived_workspace = self
+      assert_equal 1, foo1
+      WS.eval {
+        assert_instance_of Rubish::Command, foo1, "the original of derived workspace should not respond to injected bindings"
+      }
+    }
+  end
+end
+
+class Rubish::Test::Context < TUT
   def setup
     setup_tmp
   end
