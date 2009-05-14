@@ -52,4 +52,8 @@ class Rubish::UnixExecutable < Rubish::Executable
     exec!.wait
   end
 
+  def exec_with(i,o,e)
+    raise "abstract"
+  end
+
 end

@@ -80,9 +80,9 @@ class Rubish::Workspace < Rubish::Mu
     end
     alias_method :scope, :with
 
-#     def batch(ws_or_context=nil,i=nil,o=nil,e=nil,&block)
-#       RUbish::BatchExecutable.new(with(ws_or_context,i,o,e),&block) 
-#     end
+    def batch(ws_or_context=nil,i=nil,o=nil,e=nil,&block)
+      Rubish::BatchExecutable.new(with(ws_or_context,i,o,e),&block)
+    end
 
     # job control methods
     def wait(*jobs)

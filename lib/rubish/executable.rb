@@ -156,10 +156,6 @@ class Rubish::Executable
   def exec!
     raise "abstract"
   end
-  
-  def exec_with(i,o,e)
-    raise "abstract"
-  end
 
   # methods for io redirection
   def i(io=nil,&block)

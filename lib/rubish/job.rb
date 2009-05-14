@@ -1,6 +1,19 @@
 
 # a job is not necessarily registered with job control.
 class Rubish::Job
+  class Failure < Rubish::Error
+    attr_reader :job, :reason
+    def initialize(job,reason=nil)
+      raise "failure reason should be an Exception" unless reason.is_a?(Exception)
+      @job = job
+      @reason = reason
+      set_backtrace(reason.backtrace)
+    end
+
+    def to_s
+      @reason.to_s
+    end
+  end
 
   attr_accessor :result
   attr_reader :job_control
@@ -27,7 +40,7 @@ class Rubish::Job
     self
   end
 
-  # MUST call __finish after wait
+  # MUST call __finish in wait
   def wait
     raise "abstract"
     __finish

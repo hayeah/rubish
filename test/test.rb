@@ -29,6 +29,7 @@ if ARGV.first == "dev"
   end
 else
   TUT = Test::Unit::TestCase
+  TUT_ = Test::Unit::TestCase
 end
 
 
@@ -41,13 +42,17 @@ WS = Rubish.session.current_workspace
 
 RSH = Rubish::Context.global.derive
 RSH.workspace.extend(Test::Unit::Assertions)
-def rsh(&block)
-  if block
-    r = RSH.eval &block
-    RSH.workspace.waitall
-    r
+def rsh(&__block)
+  if __block
+    RSH.eval {
+      begin
+        self.eval(&__block)
+      ensure
+        waitall
+      end
+    }
   else
-    RSH
+    return RSH
   end
 end
 
@@ -613,6 +618,114 @@ class Rubish::Test::JobControl < TUT
 end
 
 
-# class Rubish::Test::Batch < TUT
+class Rubish::Test::Batch < TUT
+
+  def setup
+    setup_tmp
+  end
+
+  should "raise exception" do
+    rsh {
+      b = batch {
+        1/0
+      }
+      j = nil
+      assert_raise(Rubish::Job::Failure) {
+        b.exec
+      }
+      assert jobs.empty?
+
+      begin
+        b.exec
+      rescue Rubish::Job::Failure => e
+        assert_instance_of ZeroDivisionError, e.reason
+        assert_kind_of Rubish::Job, e.job
+        j = e.job
+        assert j.done?
+        assert_nil j.result
+        assert jobs.empty?
+      end
+      
+      assert_raise(Rubish::Job::Failure) {
+        j = b.exec!
+        j.wait
+      }
+      assert j.done?
+      assert_nil j.result
+      assert jobs.empty?
+    }
+  end
+
   
-# end
+  should "do batch as job" do
+    rsh {
+      b = batch {
+        cat.i { |p| p.puts((1..10).to_a) }.exec
+        cat.i { |p| p.puts((11..20).to_a) }.exec
+        :result
+      }
+
+      rs = b.map { |i| i.to_i }
+      assert jobs.empty?
+      assert_equal (1..20).to_a, rs
+      
+      j1 = b.exec!
+      assert_equal [j1], jobs
+      j1.wait
+      assert j1.done?
+      assert_equal :result, j1.result
+      assert jobs.empty?
+    }
+    
+  end
+  
+  
+  should "use context's IOs to execute in a batch" do
+    rsh {
+      b = batch {
+        # use the contextual stdioe
+        cat.i { |p| p.puts((1..10).to_a) }.exec
+        # fix the output to bo2, only for this executable
+        cat.i { |p| p.puts((100..110).to_a) }.o("bo2").exec
+      }.o("bo1")
+      
+      j = b.exec
+      assert j.done?
+      assert jobs.empty?
+      assert_equal (1..10).to_a, cat.i("bo1").map { |i| i.to_i }
+      assert_equal (100..110).to_a, cat.i("bo2").map { |i| i.to_i }
+
+      rm("*").exec
+      b.o("bo3").exec
+      assert j.done?
+      assert jobs.empty?
+      assert !File.exist?("bo1")
+      assert_equal (1..10).to_a, cat.i("bo3").map { |i| i.to_i }
+      assert_equal (100..110).to_a, cat.i("bo2").map { |i| i.to_i }
+      
+    }
+    
+  end
+  
+  should "be concurrent" do
+    rsh {
+      slow = Helper.slowcat(1)
+      b = batch {
+        slow.exec!
+        slow.exec!
+      }
+
+      t = Helper.time_elapsed { b.exec }
+      assert_in_delta 1, t, 0.2
+      assert jobs.empty?
+
+      j1, j2 = b.exec!, b.exec!
+      assert_equal 2, jobs.size
+      t = Helper.time_elapsed { waitall }
+      assert j1.done?
+      assert j2.done?
+      assert jobs.empty?
+    }
+  end
+  
+end
