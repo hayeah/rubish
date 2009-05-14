@@ -43,7 +43,9 @@ RSH = Rubish::Context.global.derive
 RSH.workspace.extend(Test::Unit::Assertions)
 def rsh(&block)
   if block
-    RSH.eval &block
+    r = RSH.eval &block
+    RSH.workspace.waitall
+    r
   else
     RSH
   end
@@ -59,6 +61,41 @@ end
 
 setup_tmp
 
+
+module Helper
+  class << self
+    def time_elapsed
+      t1 = Time.now
+      yield
+      return Time.now - t1
+    end
+
+    def slowcat(n)
+      rsh {
+        lines = (1..n).to_a
+        ruby("../slowcat.rb").i { |p| p.puts lines }
+      }
+    end
+
+    def workspace
+      # a custom workspace extended with two methods and assertions
+      ws = Rubish::Workspace.new.extend Module.new {
+        def foo1
+          1
+        end
+
+        def foo2
+          2
+        end
+      }, Test::Unit::Assertions
+    end
+
+    def context(i=nil,o=nil,e=nil)
+      Rubish::Context.singleton.derive(nil,i,o,e)
+    end
+  end
+end
+
 module IOHelper
   class << self
     def created_ios
@@ -71,6 +108,7 @@ module IOHelper
     end
   end
 end
+
 
 class Rubish::Test < TUT
 
@@ -316,28 +354,6 @@ class Rubish::Test::Context < TUT
     setup_tmp
   end
 
-  module Helper
-    class << self
-      def workspace
-        # a custom workspace extended with two methods and assertions
-        ws = Rubish::Workspace.new.extend Module.new {
-          def foo1
-            1
-          end
-
-          def foo2
-            2
-          end
-        }, Test::Unit::Assertions
-      end
-
-      def context(i=nil,o=nil,e=nil)
-        Rubish::Context.singleton.derive(nil,i,o,e)
-      end
-    end
-  end
-
-  
   should "stack contexts" do
     c1 = Helper.context(nil,"c1_out")
     c2 = Helper.context(nil,"c2_out")
@@ -385,7 +401,6 @@ class Rubish::Test::Context < TUT
     c12 = c1.derive
     c2 = Rubish::Context.new(WS)
 
-    puts c1.parent
     assert_nil c1.parent
     assert_equal c1, c11.parent
     assert_equal c1, c12.parent
@@ -430,30 +445,59 @@ class Rubish::Test::Context < TUT
     
   end
 
+  should "use context specific job_controls" do
+    rsh {
+      jc1 = job_control
+      slow = Helper.slowcat(1)
+      j1 = slow.exec!
+
+      jc2, j2 = nil 
+      with {
+        jc2 = job_control 
+        j2 = slow.exec!
+      }
+
+      assert_not_equal jc1, jc2
+      
+      assert_equal [j1], jc1.jobs
+      assert_equal [j2], jc2.jobs
+
+      t = Helper.time_elapsed {
+        jc1.waitall
+        jc2.waitall
+      }
+
+      assert_in_delta 1, t, 0.1
+      assert jc1.jobs.empty?
+      assert jc2.jobs.empty?
+    }
+  end
   
 end
 
-class Rubish::Test::UnixJob < TUT
+class Rubish::Test::Job < TUT
   
   def setup
     setup_tmp
   end
 
-  module Helper
-    class << self
-      def time_elapsed
-        t1 = Time.now
-        yield
-        return Time.now - t1
-      end
+  should "belong to job_control" do
+    rsh {
+      jc1 = job_control
+      j1 = ls.exec!
+      j2, jc2 = nil
+      with {
+        jc2 = job_control
+      }
 
-      def slowcat(n)
-        rsh {
-          lines = (1..n).to_a
-          ruby("../slowcat.rb").i { |p| p.puts lines }
-        }
-      end
-    end
+      assert_equal jc1, j1.job_control
+      assert_not_equal jc2, j1.job_control
+      
+      assert_raise(Rubish::Error) {
+        jc2.remove(j1)
+      }
+      
+    }
   end
 
   should "set result to array of exit statuses" do
@@ -530,52 +574,45 @@ class Rubish::Test::UnixJob < TUT
     assert_in_delta 2, t, 0.1
     
   end
-
-    
-  # should "add to job control" do
-#     rsh {
-#       slow = Helper.slowcat(1).o "/dev/null"
-#       job1 = slow.exec!
-#       job2 = slow.exec!
-#       assert_kind_of Rubish::Job, job1
-#       assert_kind_of Rubish::Job, job2
-#       assert_equal 2, jobs.values.size
-#       waitall
-#       assert_equal 0, jobs.values.size
-#     }
-#   end
-  
-#   # we'll do a bunch of timing tests to see if parallelism is working
-#   should "wait" do
-#     rsh {
-#       slow = Helper.slowcat(3)
-#       puts
-#       puts "slowcat 3 lines"
-#       t = Helper.time_elapsed { slow.exec }
-#       assert_in_delta 3, t, 1
-#       assert jobs.empty?
-#       slow = Helper.slowcat(2)
-#       puts "slowcat 2 * 3 lines in sequence"
-#       t = Helper.time_elapsed { slow.exec; slow.exec; slow.exec }
-#       assert_in_delta 6, t, 1
-#       assert jobs.empty?
-#     }
-#   end
-
-#   should "not wait" do
-#     rsh {
-#       slow = Helper.slowcat(3)
-#       puts
-#       puts "slowcat 3 * 4 lines in parallel"
-#       t = Helper.time_elapsed { slow.exec! ; slow.exec!; slow.exec!; slow.exec! }
-#       # should not wait
-#       assert_in_delta 0, t, 0.5
-#       assert_equal 4, jobs.values.size
-#       ## the above jobs should finish more or less within 3 to 6 seconds
-#       t = Helper.time_elapsed { waitall }
-#       assert_in_delta 3, t, 1
-#       assert_equal 0, jobs.values.size
-#     }
-#   end
   
 end
+
+
+class Rubish::Test::JobControl < TUT
+
+  should "use job control" do
+    rsh {
+      slow = Helper.slowcat(1).o "/dev/null"
+      job1 = slow.exec!
+      job2 = slow.exec!
+      assert_kind_of Rubish::Job, job1
+      assert_kind_of Rubish::Job, job2
+      assert_equal 2, jobs.size
+      assert_instance_of Array, jobs
+      assert jobs.include?(job1)
+      assert jobs.include?(job2)
+      job1.wait
+      job2.wait
+      assert jobs.empty?, "expects jobs to empty"
+    }
+  end
+  
+  should "job control waitall" do
+    rsh {
+      puts "slowcat 1 * 3 lines in sequence"
+      slow = Helper.slowcat(1)
+      cats = (1..3).to_a.map { slow.exec! }
+      assert_equal 3, jobs.size
+      assert cats.all? { |cat| jobs.include?(cat) }
+      t = Helper.time_elapsed { waitall }
+      assert_in_delta 1, t, 0.1
+      assert jobs.empty?
+    }
+  end
+
+end
+
+
+# class Rubish::Test::Batch < TUT
+  
+# end

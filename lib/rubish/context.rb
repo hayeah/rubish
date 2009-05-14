@@ -67,6 +67,5 @@ class Rubish::Context
     Rubish::Context.as_current(self) {
       self.workspace.eval &block
     }
-    # self.job_control.waitall
   end
 end

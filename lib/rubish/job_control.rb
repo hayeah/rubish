@@ -7,32 +7,41 @@
 
 require 'thread'
 class Rubish::JobControl
-  
-  attr_reader :jobs
+
+  class << self
+    def current
+      Rubish::Context.current.job_control
+    end
+  end
 
   def initialize
     @mutex = Mutex.new
     @jobs = { }
   end
 
+  def jobs
+    @jobs.values
+  end
+
   # need to synchronize access to the jobs hash
   def submit(job)
     raise "expects a Rubish::JobControl::Job" unless job.is_a?(Rubish::Job)
-    mutex.synchronize {
-      jobs[job.object_id] = job
+    @mutex.synchronize {
+      @jobs[job.object_id] = job
     }
   end
 
   def remove(job)
-    mutex.synchronize {
-      jobs.delete(job.object_id)
+    raise "expects a Rubish::JobControl::Job" unless job.is_a?(Rubish::Job)
+    raise Rubish::Error.new("Job not found: #{job}") unless @jobs.include?(job.object_id)
+    @mutex.synchronize {
+      @jobs.delete(job.object_id)
     }
   end
 
   def wait(*jobs)
     rss = jobs.map do |job|
-      # we might already have waited for this job.
-      job.wait if job.active?
+      job.wait
       if block_given?
         yield(job)
       else
@@ -44,7 +53,7 @@ class Rubish::JobControl
 
   # TODO handle interrupt
   def waitall(&block)
-    wait(*jobs.values,&block)
+    wait(*@jobs.values,&block)
   end
   
   

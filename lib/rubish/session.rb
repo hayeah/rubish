@@ -3,39 +3,8 @@
 # Session has a single job_control over all the workspaces.
 class Rubish::Session
 
-  module JobControl
-    def wait(*jobs)
-      job_control.wait(*jobs)
-    end
-
-    def waitall
-      job_control.waitall
-    end
-
-    def stop(job)
-      job_control.stop(job)
-    end
-
-    def jobs
-      job_control.jobs
-    end
-
-    def job_control
-      Rubish::Session.session.job_control
-    end
-
-    private
-
-    def job_started(job)
-      job_control.started(job)
-    end
-  end
-
-  include JobControl
   
   class << self
-
-    include JobControl
 
     def new_session
       @session.exit if @session
@@ -60,13 +29,11 @@ class Rubish::Session
     end
   end
 
-  attr_reader :job_control
   attr_reader :root_workspace
   attr_reader :current_workspace
   
   def initialize
     @scanner = RubyLex.new
-    @job_control = Rubish::JobControl.new
     @root_workspace = Rubish::Workspace.new
     @current_workspace = @root_workspace
   end

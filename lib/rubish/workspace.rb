@@ -10,8 +10,7 @@ class Rubish::Workspace < Rubish::Mu
   end
 
   module Base
-    include Rubish::Session::JobControl
-
+    
     # TODO move this to context?
     def cd(dir,&block)
       if block
@@ -80,6 +79,31 @@ class Rubish::Workspace < Rubish::Mu
       end
     end
     alias_method :scope, :with
+
+#     def batch(ws_or_context=nil,i=nil,o=nil,e=nil,&block)
+#       RUbish::BatchExecutable.new(with(ws_or_context,i,o,e),&block) 
+#     end
+
+    # job control methods
+    def wait(*jobs)
+      job_control.wait(*jobs)
+    end
+
+    def waitall
+      job_control.waitall
+    end
+
+    def stop(job)
+      job_control.stop(job)
+    end
+
+    def jobs
+      job_control.jobs
+    end
+
+    def job_control
+      current_context.job_control
+    end
 
     private
 

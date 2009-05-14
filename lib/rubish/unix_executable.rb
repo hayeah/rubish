@@ -4,13 +4,13 @@ class Rubish::UnixExecutable < Rubish::Executable
     attr_reader :pids
 
     def initialize(exe)
-      super
       # prepare_io returns an instance of ExeIO
       i = EIO.i(exe.i)
       o = EIO.o(exe.o)
       e = EIO.err(exe.err)
       @ios = [i,o,e]
       @pids = exe.exec_with(i.io,o.io,e.io)
+      __start
     end
 
     def wait
@@ -19,11 +19,11 @@ class Rubish::UnixExecutable < Rubish::Executable
         Process.wait(pid)
         $?
       end
-      @done = true
       @ios.each do |io|
         io.close
       end
-      self
+      __finish
+      return self
     end
 
     def stop(sig="TERM")
@@ -49,10 +49,7 @@ class Rubish::UnixExecutable < Rubish::Executable
 
   # TODO catch interrupt here
   def exec
-    job = exec!
-    job.wait
-    job
+    exec!.wait
   end
-
 
 end
