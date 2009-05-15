@@ -34,8 +34,15 @@ class Rubish::Command < Rubish::UnixExecutable
         Kernel.exec "#{self.cmd} #{args.join " "}"
       end
     rescue
-      puts $!
-      Kernel.exit(1)
+      # with just want to kill the child
+      # process. When something goes wrong with
+      # exec. No cleanup necessary.
+      #
+      # There's a weird problem with
+      # Process.exit(non_zero) raising SystemExit,
+      # and that exception somehow reaches the
+      # parent process.
+      Process.exit!(1)
     end
   end
 

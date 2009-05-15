@@ -1,7 +1,17 @@
 class Rubish::UnixExecutable < Rubish::Executable
   EIO = Rubish::Executable::ExecutableIO
+  
   class UnixJob < Rubish::Job
     attr_reader :pids
+    attr_reader :goods
+    attr_reader :bads
+
+    class BadExit < RuntimeError
+      attr_reader :exitstatuses
+      def initialize(exitstatuses)
+        @exitstatuses = exitstatuses
+      end
+    end
 
     def initialize(exe)
       # prepare_io returns an instance of ExeIO
@@ -15,15 +25,24 @@ class Rubish::UnixExecutable < Rubish::Executable
 
     def wait
       raise Rubish::Error.new("already waited") if self.done?
-      @result = self.pids.map do |pid|
-        Process.wait(pid)
-        $?
+      begin
+        exits = self.pids.map do |pid|
+          Process.wait(pid)
+          $?
+        end
+        @ios.each do |io|
+          io.close
+        end
+        @goods, @bads = exits.partition { |status| status.exitstatus == 0}
+        @result = goods # set result to processes that exit properly
+        if !bads.empty?
+          raise Rubish::Job::Failure.new(self,BadExit.new(bads))
+        else
+          return self
+        end
+      ensure
+        __finish
       end
-      @ios.each do |io|
-        io.close
-      end
-      __finish
-      return self
     end
 
     def stop(sig="TERM")
@@ -35,10 +54,6 @@ class Rubish::UnixExecutable < Rubish::Executable
 
     def stop!
       self.stop("KILL")
-    end
-
-    def ok?
-      done? && !@result.any? {|status| !(status.exitstatus == 0)}
     end
 
   end

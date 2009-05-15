@@ -235,83 +235,100 @@ class Rubish::Test::Workspace::Base < TUT
   
 end
 
-class Rubish::Test::Executable < TUT
+class Rubish::Test::IO < TUT
+
   def setup
     setup_tmp
   end
-  
-  context "io" do
-    should "chomp lines for each/map" do
-      rsh {
-        ints = (1..100).to_a.map { |i| i.to_s }
-        cat.o("output").i { |p| p.puts(ints)}.exec
-        # raw access to pipe would have newlines
-        cat.i("output").o do |p|
-          p.each { |l| assert l.chomp!
-          }
-        end.exec
-        # iterator would've chomped the lines
-        cat.i("output").each do |l|
-          assert_nil l.chomp!
-        end
-      }
-    end
-    
-    should "redirect io" do
-      rsh {
-        ints = (1..100).to_a.map { |i| i.to_s }
-        cat.o("output").i { |p| p.puts(ints)}.exec
-        assert_equal ints, cat.i("output").map
-        assert_equal ints, p { cat; cat; cat}.i("output").map
-        assert_equal ints, cat.i { |p| p.puts(ints) }.map
-      }
-    end
 
-    should "close pipes used for io redirects" do
-      rsh {
-        ios = IOHelper.created_ios do
-          cat.i { |p| p.puts "foobar" }.o { |p| p.readlines }.exec
-        end
-        assert ios.all? { |io| io.closed? }
-        ios = IOHelper.created_ios do
-          cat.i { |p| p.puts "foobar" }.o("output").exec
-        end
-        assert ios.all? { |io| io.closed? }
-      }
-    end
-
-    should "not close stdioe" do
-      rsh {
-        assert_not $stdin.closed?
-        assert_not $stdout.closed?
-        assert_not $stderr.closed?
-        ios = IOHelper.created_ios do
-          ls.exec
-        end
-        assert ios.empty?
-        assert_not $stdin.closed?
-        assert_not $stdout.closed?
-        assert_not $stderr.closed?
-      }
-    end
-    
-    should "not close io if redirecting to existing IO object" do
-      rsh {
-        begin
-          f = File.open("/dev/null","w")
-          ios = IOHelper.created_ios do
-            ls.o(f).exec
-          end
-          assert ios.empty?
-          assert_not f.closed?
-        ensure
-          f.close
-        end
-      }
-    end
-    
+  should "chomp lines for each/map" do
+    rsh {
+      ints = (1..100).to_a.map { |i| i.to_s }
+      cat.o("output").i { |p| p.puts(ints)}.exec
+      # raw access to pipe would have newlines
+      cat.i("output").o do |p|
+        p.each { |l| assert l.chomp!
+        }
+      end.exec
+      # iterator would've chomped the lines
+      cat.i("output").each do |l|
+        assert_nil l.chomp!
+      end
+    }
   end
   
+  should "redirect io" do
+    rsh {
+      ints = (1..100).to_a.map { |i| i.to_s }
+      cat.o("output").i { |p| p.puts(ints)}.exec
+      assert_equal ints, cat.i("output").map
+      assert_equal ints, p { cat; cat; cat}.i("output").map
+      assert_equal ints, cat.i { |p| p.puts(ints) }.map
+    }
+  end
+
+  should "close pipes used for io redirects" do
+    rsh {
+      ios = IOHelper.created_ios do
+        cat.i { |p| p.puts "foobar" }.o { |p| p.readlines }.exec
+      end
+      assert ios.all? { |io| io.closed? }
+      ios = IOHelper.created_ios do
+        cat.i { |p| p.puts "foobar" }.o("output").exec
+      end
+      assert ios.all? { |io| io.closed? }
+    }
+  end
+
+  should "not close stdioe" do
+    rsh {
+      assert_not $stdin.closed?
+      assert_not $stdout.closed?
+      assert_not $stderr.closed?
+      ios = IOHelper.created_ios do
+        ls.exec
+      end
+      assert ios.empty?
+      assert_not $stdin.closed?
+      assert_not $stdout.closed?
+      assert_not $stderr.closed?
+    }
+  end
+  
+  should "not close io if redirecting to existing IO object" do
+    rsh {
+      begin
+        f = File.open("/dev/null","w")
+        ios = IOHelper.created_ios do
+          ls.o(f).exec
+        end
+        assert ios.empty?
+        assert_not f.closed?
+      ensure
+        f.close
+      end
+    }
+  end
+
+  
+end
+
+class Rubish::Test::Executable < TUT
+
+  def setup
+    setup_tmp
+  end
+
+  should "set result to good exits" do
+    rsh {
+      j = cat.i { |p| p.puts 1}.exec
+      assert j.done?
+      assert_equal 1, j.result.size
+      assert_equal 0, j.result.first.exitstatus
+      assert_equal j.result, j.goods
+    }
+  end
+    
   should "head,first/tail,last" do
     rsh {
       ls_in_order = p { ls; sort :n }
@@ -347,6 +364,30 @@ class Rubish::Test::Executable < TUT
       assert_equal 2, ls.map.size
       exec rm(files).q
       assert_equal 0, ls.map.size
+      
+    }
+  end
+
+  should "raise when exit status not zero" do
+    rsh {
+      
+      r = assert_raise(Rubish::Job::Failure) {
+        foobarqux_is_no_command.exec
+      }
+      
+      begin
+        foobarqux_is_no_command.exec
+      rescue Rubish::Job::Failure => e
+        j = e.job
+        assert j.done?
+        assert jobs.empty?
+        # the result should be the processes that
+        # exit properly. in this case, the empty
+        # array.
+        assert j.result.empty? 
+        assert_equal 1, e.reason.exitstatuses.size
+        assert_not_equal 0, e.reason.exitstatuses.first.exitstatus
+      end
       
     }
   end
@@ -480,7 +521,7 @@ class Rubish::Test::Context < TUT
   
 end
 
-class Rubish::Test::Job < TUT
+class Rubish::Test::Job < TUT_
   
   def setup
     setup_tmp
@@ -525,7 +566,7 @@ class Rubish::Test::Job < TUT
       js.each { |j| j.wait }
     }
     assert_in_delta 1, t, 0.1
-    assert j1.ok? && j2.ok? && j3.ok?
+    assert j1.done? && j2.done? && j3.done?
     rs = [a1,a2,a3]
     # each result should be an array of sized 3
     assert(rs.all? { |r| r.size == 1 })
@@ -544,7 +585,7 @@ class Rubish::Test::Job < TUT
       j1.wait; j2.wait; j3.wait
     }
     assert_in_delta 1, t, 0.1
-    assert j1.ok? && j2.ok? && j3.ok?
+    assert j1.done? && j2.done? && j3.done?
     # each result should be an array of sized 3
     assert_equal 3, acc.size
   end
@@ -552,11 +593,9 @@ class Rubish::Test::Job < TUT
   should "wait for job" do
     job = Helper.slowcat(1).exec!
     assert_equal false, job.done?
-    assert_equal false, job.ok?
     t = Helper.time_elapsed { job.wait }
     assert_in_delta 0.1, t, 1
     assert_equal true, job.done?
-    assert_equal true, job.ok?
   end
   
   should "raise when waited twice" do
@@ -570,13 +609,25 @@ class Rubish::Test::Job < TUT
 
   should "kill a job" do
     acc = []
+    j = Helper.slowcat(10).map!(acc)
+    e = nil
     t = Helper.time_elapsed {
-      job = Helper.slowcat(10).map!(acc)
       sleep(2)
-      job.stop!
+      begin
+        j.stop!
+      rescue
+        e = $!
+        assert_instance_of Rubish::Job::Failure, e
+        assert_equal j, e.job
+        assert_equal 1, j.bads.size
+        assert_equal 0, j.goods.size
+      end
     }
     assert_in_delta 2, acc.size, 1, "expects to get roughly two lines out before killing process"
     assert_in_delta 2, t, 0.1
+    assert j.done?
+    
+    
     
   end
   
