@@ -1,15 +1,23 @@
 
 class Rubish::Pipe < Rubish::UnixExecutable
   attr_reader :cmds
+
+  class << self
+    def build(workspace=nil,&block)
+      workspace ||= Rubish::Context.current.workspace
+      cmds = []
+      workspace.command_factory_hook = Proc.new { |cmd| cmds << cmd; cmd}
+      workspace.eval &block
+      self.new(cmds)
+    end
+  end
   
-  def initialize(workspace,&block)
-    cmds = []
-    workspace = workspace.__dup
-    workspace.command_factory_hook = Proc.new { |cmd| cmds << cmd; cmd}
-    workspace.eval &block
-    @cmds = cmds
+  
+  def initialize(cmds)
     # dun wanna handle special case for now
-    raise "pipe length less than 2" if @cmds.length < 2
+    raise "pipe length less than 2" if cmds.length < 2
+    raise "should build pipe only from Rubish::Command instances" unless cmds.all? { |c| c.is_a?(Rubish::Command)}
+    @cmds = cmds
   end
 
   def exec_with(pipe_in,pipe_out,pipe_err)

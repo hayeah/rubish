@@ -32,9 +32,23 @@ class Rubish::Workspace < Rubish::Mu
       Rubish::Command.new(method,args)
     end
 
-    def p(&block)
+    def p(cmds_or_workspace=nil,&block)
       # self is the workspace
-      Rubish::Pipe.new(self,&block)
+      case cmds_or_workspace
+      when Array
+        raise "build pipe from an array of commands or a block" if block
+        cmds = cmds_or_workspace
+        Rubish::Pipe.new(cmds)
+      when Rubish::Workspace
+        workspace = cmds_or_workspace
+        Rubish::Pipe.build(workspace.derive,&block)
+      when nil
+        # actually redundant (since pipe builder
+        # uses the current workspace when given
+        # workspace is nil anyway. But it's nice
+        # to be explicit).
+        Rubish::Pipe.build(current_workspace.derive,&block)
+      end
     end
 
     def exec(*exes)

@@ -394,6 +394,41 @@ class Rubish::Test::Executable < TUT
   
 end
 
+class Rubish::Test::Pipe < TUT
+  def setup
+    setup_tmp
+  end
+
+  should "build pipe with a block in workspace" do
+    rsh {
+      pipe = p { cat ; cat ; cat}
+      assert_instance_of Rubish::Pipe, pipe
+      assert_equal 3, pipe.cmds.length
+      assert_equal 1, pipe.i { |p| p.puts 1 }.first.to_i
+
+      # specify a workspace to build pipe with
+      pipe2 = Rubish::Pipe.build(current_workspace.derive { def foo; abcde; end}) {
+        foo
+        foo
+      }
+      assert_equal 2, pipe2.cmds.length
+      assert_equal "abcde", pipe2.cmds.first.cmd
+    }
+  end
+
+  should "build pipe with an array" do
+    rsh {
+      # tee to 10 files along the pipeline
+      tees = (1..10).map { |i| tee "o#{i}" }
+      p(tees).i { |p| p.puts "1" }.exec
+      assert_equal 10, ls.map.length
+      (1..10).map { |i|
+        assert_equal 1, cat("o#{i}").first.to_i
+      }
+    }
+  end
+end
+
 
 class Rubish::Test::Context < TUT
   def setup
@@ -521,7 +556,7 @@ class Rubish::Test::Context < TUT
   
 end
 
-class Rubish::Test::Job < TUT_
+class Rubish::Test::Job < TUT
   
   def setup
     setup_tmp
