@@ -1,9 +1,7 @@
-class Rubish::Sed < Rubish::Executable
-  include Rubish::Streamer
-
+class Rubish::Sed < Rubish::Streamer
+  
   def initialize(exe)
-    init_streamer
-    @exe = exe
+    super(exe)
   end
   
   def q
@@ -26,12 +24,6 @@ class Rubish::Sed < Rubish::Executable
 
   private
 
-  def exec_with(_i,o,_e)
-    @exe.pipe_out do |pipe|
-      process_stream(pipe,o)
-    end
-  end
-
   def stream_begin
   end
 
@@ -40,7 +32,6 @@ class Rubish::Sed < Rubish::Executable
 
   def stream_end
   end
-
   
 
 end

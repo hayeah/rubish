@@ -123,41 +123,21 @@ class Rubish::Executable
     self
   end
 
-#   def awk(address=nil,&block)
-#     if block
-#       Rubish::Awk.new(self).act(&block)
-#     else
-#       Rubish::Awk.new(self)
-#     end
-#   end
-
-  
-  def sed(address=nil,&block)
-    Rubish::Sed.new(self).act(&block)
-    # if block
-      
-#     else
-#       Rubish::Sed.new(self)
-#     end
-    
+  def awk(address=nil,&block)
+    if block
+      Rubish::Awk.new(self).act(&block)
+    else
+      Rubish::Awk.new(self)
+    end
   end
-  
-  # def exec!
-#     if self.working_directory
-#       Rubish.session.cd(self.working_directory) do
-#         Job.start(self)
-#       end
-#     else
-#       Job.start(self)
-#     end
-#   end
 
-#   # TODO catch interrupt here
-#   def exec
-#     job = exec!
-#     job.wait
-#     job
-#   end
+  def sed(address=nil,&block)
+    if block
+      Rubish::Sed.new(self).act(&block)  
+    else
+      Rubish::Sed.new(self)
+    end
+  end
 
   def exec
     raise "abstract"
@@ -189,6 +169,18 @@ class Rubish::Executable
   def io(i=nil,o=nil)
     i(i); o(o)
     self
+  end
+
+  def i=(io)
+    @__io_in = io
+  end
+
+  def o=(io)
+    @__io_out = io
+  end
+
+  def err=(io)
+    @__io_err = io
   end
 
   def each!

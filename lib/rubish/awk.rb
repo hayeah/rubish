@@ -1,13 +1,11 @@
-class Rubish::Awk < Rubish::Executable
-  include Rubish::Streamer
+class Rubish::Awk < Rubish::Streamer
   
   attr_reader :a # array of fields
   attr_reader :r # string of current record
   attr_reader :nf # number of fields for current record
   
   def initialize(exe)
-    init_streamer
-    @exe = exe
+    super(exe)
     @fs = /\s+/
     @nf = 0 # number of fields for a record
     @acts = []
@@ -41,14 +39,6 @@ class Rubish::Awk < Rubish::Executable
 
   def stream_end
     self.instance_eval(&@end_act) if @end_act
-  end
-
-  def exec_with(i,o,e)
-    result = nil
-    @exe.pipe_out do |pipe|
-      result = process_stream(pipe,o)
-    end
-    return result
   end
   
   def begin(&block)

@@ -1,13 +1,17 @@
+# a Streamer wraps the output of an exectuable
+#
 # this implements the streaming abstraction for
 # Rubish::{Sed,Awk}, corresponding to Unix
 # Power Fools of similar names.
-module Rubish::Streamer
+class Rubish::Streamer < Rubish::Executable
   attr_accessor :line
   attr_reader :output
   attr_reader :lineno
   attr_reader :buckets, :bucket_types
+  attr_reader :exe
   
-  def init_streamer
+  def initialize(exe)
+    @exe = exe
     @acts = []
     @output = nil # the IO object that puts and pp should write to.
     @buffer = [] # look ahead buffer for peek(n)
@@ -22,6 +26,35 @@ module Rubish::Streamer
     output.puts args
   end
 
+  def gets
+    input.gets
+  end
+
+  # redirect 
+  def exec!
+    streamer = self
+    Rubish::Job::ThreadJob.new {
+      begin
+        result = nil
+        old_output = streamer.exe.o
+        output = Rubish::Executable::ExecutableIO.ios([streamer.o || Rubish::Context.current.o,"w"]).first
+        # ask exe to output to a pipe
+        streamer.exe.o { |input|
+          # input to streamer is the output of the executable
+          result = streamer.exec_with(input,output.io,nil)
+        }.exec
+        result
+      ensure
+        streamer.exe.o = old_output # restores the output of the old executable
+        output.close if output
+      end
+    }
+  end
+
+  def exec
+    exec!.wait
+  end
+
   def pp(obj)
     output.pp obj
   end
@@ -29,10 +62,10 @@ module Rubish::Streamer
   ##################################################
   # Line Buffer Handling Stuff
 
-  def process_stream(stream,output)
-    raise "should init streamer with an IO object" unless stream.is_a?(IO)
-    @output = output
-    @stream = stream
+  def exec_with(i,o,_e=nil)
+    raise "error stream shouldn't be used" if _e
+    @output = o
+    @input = i
     begin
       stream_begin # abstract
       while string = get_string
@@ -93,7 +126,7 @@ module Rubish::Streamer
   def get_string
     # use line in lookahead buffer if there's any
     if @buffer.empty?
-      r = @stream.gets
+      r = @input.gets
       r.chomp! if r
     else
       r = @buffer.shift
@@ -111,7 +144,7 @@ module Rubish::Streamer
     # or keep reading from the pipe if we don't.
     n = n - lines.length
     n.times do |i|
-      s = @stream.gets
+      s = @input.gets
       break if s.nil? # EOF
       s.chomp!
       lines << s

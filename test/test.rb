@@ -69,6 +69,12 @@ setup_tmp
 
 module Helper
   class << self
+    def cat(data)
+      rsh {
+        cat.i { |p| p.puts data}
+      }
+    end
+    
     def time_elapsed
       t1 = Time.now
       yield
@@ -427,6 +433,47 @@ class Rubish::Test::Pipe < TUT
       }
     }
   end
+end
+
+class Rubish::Test::Streamer < TUT_
+  def setup
+    setup_tmp
+  end
+
+  should "streamer should capture executable's output" do
+    rsh {
+      cataa = Helper.cat("aa")
+      output = cataa.o
+      assert_equal "aa", cataa.sed {p}.first
+      assert_equal output, cataa.o
+    }
+  end
+
+  should "allow streamer chain" do
+    rsh {
+      assert_equal "aa", Helper.cat("aa").sed { p }.sed { p }.sed { p }.first
+    }
+  end
+  
+  should "sed with s and gs" do
+    rsh {
+      # aa => iia => eyeeyea
+      assert_equal "eyeeyea",  Helper.cat("aa").sed { s /a/, "ii"; gs /i/, "eye"; p}.first
+    }
+  end
+
+  should "peek" do
+    rsh {
+      j = Helper.cat((1..10).to_a).awk {
+        collect(:three,[line,*peek(2)])
+      }.end { three }.exec
+      j.result.each_index { |i|
+        arr = (i+1..[i+1+2,10].min).to_a.map { |o| o.to_s }
+        assert_equal arr, j.result[i]
+      }
+    }
+  end
+  
 end
 
 
