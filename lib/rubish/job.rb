@@ -56,3 +56,34 @@ class Rubish::Job
   end
   
 end
+
+# carry out some computation in a thread.
+class Rubish::Job::ThreadJob < Rubish::Job
+  attr_reader :thread
+  def initialize(&block)
+    # run block in a thread
+    @thread = ::Thread.new {
+      block.call
+    }
+    __start
+  end
+
+  def wait
+    # wait thread to completeggg64
+    begin
+      @thread.join
+      @result = @thread.value
+      return self
+    rescue => e
+      raise Rubish::Job::Failure.new(self,e)
+    ensure
+      __finish
+    end
+  end
+
+  def stop
+    @thread.kill
+    wait
+  end
+  
+end
