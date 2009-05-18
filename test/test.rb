@@ -433,7 +433,7 @@ class Rubish::Test::Pipe < TUT
   end
 end
 
-class Rubish::Test::Streamer < TUT
+class Rubish::Test::Streamer < TUT_
   def setup
     setup_tmp
   end
@@ -465,10 +465,30 @@ class Rubish::Test::Streamer < TUT
       rs = Helper.cat((1..10).to_a).awk {
         collect(:three,[line,*peek(2)])
       }.end { three }.exec
-      rs.each_index { |i|
-        arr = (i+1..[i+1+2,10].min).to_a.map { |o| o.to_s }
-        assert_equal arr, rs[i]
-      }
+      assert_equal [["1", "2", "3"],
+                    ["2", "3", "4"],
+                    ["3", "4", "5"],
+                    ["4", "5", "6"],
+                    ["5", "6", "7"],
+                    ["6", "7", "8"],
+                    ["7", "8", "9"],
+                    ["8", "9", "10"],
+                    ["9", "10"],
+                    ["10"]], rs
+    }
+  end
+
+  should "skip" do
+    rsh {
+      rs = Helper.cat((1..10).to_a).awk {
+        collect(:three,[line,*peek(2)])
+        skip(2)
+      }.end { three }.exec
+      assert_equal [["1", "2", "3"],
+                    ["4", "5", "6"],
+                    ["7", "8", "9"],
+                    ["10"]], rs
+      
     }
   end
   
