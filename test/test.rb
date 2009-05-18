@@ -327,11 +327,9 @@ class Rubish::Test::Executable < TUT
 
   should "set result to good exits" do
     rsh {
-      j = cat.i { |p| p.puts 1}.exec
-      assert j.done?
-      assert_equal 1, j.result.size
-      assert_equal 0, j.result.first.exitstatus
-      assert_equal j.result, j.goods
+      r = cat.i { |p| p.puts 1}.exec
+      assert_equal 1, r.size
+      assert_equal 0, r.first.exitstatus
     }
   end
     
@@ -435,7 +433,7 @@ class Rubish::Test::Pipe < TUT
   end
 end
 
-class Rubish::Test::Streamer < TUT_
+class Rubish::Test::Streamer < TUT
   def setup
     setup_tmp
   end
@@ -464,12 +462,12 @@ class Rubish::Test::Streamer < TUT_
 
   should "peek" do
     rsh {
-      j = Helper.cat((1..10).to_a).awk {
+      rs = Helper.cat((1..10).to_a).awk {
         collect(:three,[line,*peek(2)])
       }.end { three }.exec
-      j.result.each_index { |i|
+      rs.each_index { |i|
         arr = (i+1..[i+1+2,10].min).to_a.map { |o| o.to_s }
-        assert_equal arr, j.result[i]
+        assert_equal arr, rs[i]
       }
     }
   end
@@ -630,7 +628,7 @@ class Rubish::Test::Job < TUT
 
   should "set result to array of exit statuses" do
     rsh {
-      ls.exec.result.each { |status|
+      ls.exec.each { |status|
         assert_instance_of Process::Status, status
         assert_equal 0, status.exitstatus
       }
@@ -682,10 +680,11 @@ class Rubish::Test::Job < TUT
   
   should "raise when waited twice" do
     assert_raise(Rubish::Error) {
-      rsh { ls.exec.wait }
-    }
-    assert_raise(Rubish::Error) {
-      rsh { ls.exec!.wait.wait }
+      rsh {
+        j = ls.exec!
+        j.wait
+        j.wait
+      }
     }
   end
 
@@ -822,15 +821,13 @@ class Rubish::Test::Batch < TUT
         cat.i { |p| p.puts((100..110).to_a) }.o("bo2").exec
       }.o("bo1")
       
-      j = b.exec
-      assert j.done?
+      b.exec
       assert jobs.empty?
       assert_equal (1..10).to_a, cat.i("bo1").map { |i| i.to_i }
       assert_equal (100..110).to_a, cat.i("bo2").map { |i| i.to_i }
 
       rm("*").exec
       b.o("bo3").exec
-      assert j.done?
       assert jobs.empty?
       assert !File.exist?("bo1")
       assert_equal (1..10).to_a, cat.i("bo3").map { |i| i.to_i }

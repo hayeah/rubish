@@ -38,7 +38,7 @@ class Rubish::UnixExecutable < Rubish::Executable
         if !bads.empty?
           raise Rubish::Job::Failure.new(self,BadExit.new(bads))
         else
-          return self
+          return self.result
         end
       ensure
         __finish

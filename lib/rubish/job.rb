@@ -41,6 +41,7 @@ class Rubish::Job
   end
 
   # MUST call __finish in wait
+  # should return Job#result
   def wait
     raise "abstract"
     __finish
@@ -73,7 +74,7 @@ class Rubish::Job::ThreadJob < Rubish::Job
     begin
       @thread.join
       @result = @thread.value
-      return self
+      return self.result
     rescue => e
       raise Rubish::Job::Failure.new(self,e)
     ensure
