@@ -2,16 +2,24 @@ class Rubish::Executable
 
   class ExecutableIO
     class << self
-      def i(i=nil)
-        prepare_io(i || Rubish::Context.current.i,"r")
-      end
-
-      def o(o=nil)
-        prepare_io(o || Rubish::Context.current.o,"w")
-      end
-
-      def err(err=nil)
-        prepare_io(err || Rubish::Context.current.err,"w")
+      # transactionally open a bunch of ios
+      # if one fails to open, close all others.
+      def ios(*specs)
+        success = false
+        begin
+          exe_ios = []
+          specs.each do |(spec,mode)|
+            exe_ios << prepare_io(spec,mode)
+          end
+          success =true
+          return exe_ios
+        ensure
+          unless success
+            exe_ios.each { |exe_io|
+              exe_io.close
+            }
+          end
+        end
       end
       
       private
@@ -124,13 +132,15 @@ class Rubish::Executable
 #   end
 
   
-#   def sed(address=nil,&block)
-#     if block
-#       Rubish::Sed.new(self).act(&block)
+  def sed(address=nil,&block)
+    Rubish::Sed.new(self).act(&block)
+    # if block
+      
 #     else
 #       Rubish::Sed.new(self)
 #     end
-#   end
+    
+  end
   
   # def exec!
 #     if self.working_directory

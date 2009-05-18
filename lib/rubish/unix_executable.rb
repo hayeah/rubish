@@ -15,11 +15,11 @@ class Rubish::UnixExecutable < Rubish::Executable
 
     def initialize(exe)
       # prepare_io returns an instance of ExeIO
-      i = EIO.i(exe.i)
-      o = EIO.o(exe.o)
-      e = EIO.err(exe.err)
-      @ios = [i,o,e]
-      @pids = exe.exec_with(i.io,o.io,e.io)
+      @ios = EIO.ios([exe.i || Rubish::Context.current.i,"r"],
+                     [exe.o || Rubish::Context.current.o,"w"],
+                     [exe.err || Rubish::Context.current.err,"w"])
+      i,o,err = @ios
+      @pids = exe.exec_with(i.io,o.io,err.io)
       __start
     end
 
