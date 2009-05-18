@@ -45,7 +45,7 @@ class Rubish::Context
 
   def initialize_copy(from)
     # note that we use the cloned workspace of the parent's workspace.
-    initialize(from.workspace.__clone,
+    initialize(from.workspace.derive,
                from.i, from.o, from.err)
     @job_control = Rubish::JobControl.new
   end
@@ -63,9 +63,13 @@ class Rubish::Context
     return child
   end
   
-  def eval(&block)
+  def eval(string=nil,&block)
     Rubish::Context.as_current(self) {
-      self.workspace.eval &block
+      if string
+        self.workspace.eval(string)
+      else
+        eslf.workspace.eval(&block)
+      end
     }
   end
 end

@@ -9,40 +9,28 @@ module Rubish
   
   class << self
     def repl
-      Session.repl
+      Repl.repl
     end
 
-    def new_session
-      Session.new_session
-    end
-    
-    def session
-      Session.session
-    end
-
-    def eval(string=nil,&block)
-      Session.eval(string,&block)
-    end
-
-    def reload
-      (%w{
-rubish/stub
-rubish/job
-rubish/job_control
-rubish/session
-rubish/workspace
-rubish/executable
-rubish/command
-rubish/command_builder
-rubish/pipe
-rubish/streamer} +
-       %w{
-rubish/sed
-rubish/awk
-}).each {|e| $".delete(e + '.rb') }
-      require 'rubish'
-      repl
-    end
+    # def reload
+#       (%w{
+# rubish/stub
+# rubish/job
+# rubish/job_control
+# rubish/session
+# rubish/workspace
+# rubish/executable
+# rubish/command
+# rubish/command_builder
+# rubish/pipe
+# rubish/streamer} +
+#        %w{
+# rubish/sed
+# rubish/awk
+# }).each {|e| $".delete(e + '.rb') }
+#       require 'rubish'
+#       repl
+#     end
 
     # dup2 the given i,o,e to stdin,stdout,stderr
     # close all other file descriptors.
