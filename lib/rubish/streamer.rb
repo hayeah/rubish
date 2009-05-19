@@ -4,6 +4,53 @@
 # Rubish::{Sed,Awk}, corresponding to Unix
 # Power Fools of similar names.
 class Rubish::Streamer < Rubish::Executable
+
+  class Trigger
+    attr_accessor :inverted
+    def initialize(streamer,block,a,b,inverted=false)
+      @block = block
+      @streamer = streamer
+      raise "the first pattern can't be null" if a.nil?
+      @a = a
+      @b = b # could be nil. If so, this is a positioned trigger.
+      @inverted = inverted
+      @tripped = false
+    end
+
+    def call
+      if @b
+        @streamer.instance_eval(&@block) if range_trigger
+      else
+        @streamer.instance_eval(&@block) if position_trigger
+      end
+    end
+
+    def range_trigger
+      if @tripped
+        @tripped = !test(@b)
+        true
+      else
+        @tripped = test(@a)
+      end
+    end
+
+    def position_trigger
+      test(@a)
+    end
+
+    def test(trigger)
+      case trigger
+      when :eof, -1
+        @streamer.peek.empty?
+      when :bof, 1
+        @streamer.lineno == 1
+      when Integer
+        @streamer.lineno == trigger
+      when Regexp
+        !(@streamer.line =~ trigger).nil?
+      end
+    end
+  end
   attr_accessor :line
   attr_reader :output
   attr_reader :lineno
@@ -26,11 +73,7 @@ class Rubish::Streamer < Rubish::Executable
     output.puts args
   end
 
-  def gets
-    input.gets
-  end
-
-  # redirect 
+  # redirect
   def exec!
     streamer = self
     Rubish::Job::ThreadJob.new {
@@ -75,7 +118,11 @@ class Rubish::Streamer < Rubish::Executable
         catch :interrupt do
           @acts.each do |act|
             # evaluate in the context of the object that included the Streamer.
-            self.instance_eval(&act)
+            if act.is_a?(Trigger)
+              act.call
+            else
+              self.instance_eval(&act)
+            end
           end
           interrupted = false
         end
@@ -83,7 +130,7 @@ class Rubish::Streamer < Rubish::Executable
           case @interrupt
           when :quit
             break # stop processing
-          when :next
+          when :done
             next # restart loop, skip other actions
           else
             raise "Unknown Sed Interrupt: #{@interrupt}"
@@ -110,9 +157,12 @@ class Rubish::Streamer < Rubish::Executable
     raise "abstract"
   end
 
-  def act(address=nil,&block)
-    raise "addressed action not implemented yet" if address
-    @acts << block
+  def act(a=nil,b=nil,&block)
+    if a || b
+      @acts << Trigger.new(self,block,a,b)
+    else
+      @acts << block
+    end
     return self
   end
 
@@ -164,8 +214,8 @@ class Rubish::Streamer < Rubish::Executable
   end
 
   # skip other actions
-  def next
-    interrupt(:next)
+  def done
+    interrupt(:done)
   end
 
   def quit

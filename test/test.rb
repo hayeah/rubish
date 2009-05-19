@@ -35,10 +35,6 @@ end
 
 TEST_DIR = File.expand_path(File.dirname(__FILE__)) + "/tmp"
 
-Rubish.new_session
-
-WS = Rubish.session.current_workspace
-#WS.extend Test::Unit::Assertions
 
 RSH = Rubish::Context.global.derive
 RSH.workspace.extend(Test::Unit::Assertions)
@@ -433,7 +429,7 @@ class Rubish::Test::Pipe < TUT
   end
 end
 
-class Rubish::Test::Streamer < TUT_
+class Rubish::Test::Streamer < TUT
   def setup
     setup_tmp
   end
@@ -492,6 +488,25 @@ class Rubish::Test::Streamer < TUT_
     }
   end
   
+  should "trigger by position" do
+    assert_equal "1", Helper.cat((1..10).to_a).sed(:bof){p}.first
+    assert_equal "10", Helper.cat((1..10).to_a).sed(:eof){p}.first
+    assert_equal "1", Helper.cat((1..10).to_a).sed(1){p}.first
+    assert_equal "10", Helper.cat((1..10).to_a).sed(-1){p}.first
+    assert_equal ["1","10"], Helper.cat((1..10).to_a).sed(/1/){p}.map
+    rs = Helper.cat((1..10).to_a).sed(1) { p "a1"; done}.act { p "b" + line }.map
+    assert_equal rs, ["a1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "b10"]
+  end
+
+  should "trigger by range" do
+    assert_equal ["3","4","5"], Helper.cat((1..10).to_a).sed(3,5) { p }.map
+    assert_equal ["8","9","10"], Helper.cat((1..10).to_a).sed(8,:eof) { p }.map
+    assert_equal \
+      ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+      Helper.cat((1..10).to_a).sed(:bof,:eof) { p }.map
+    assert_equal ["b","c","b"], Helper.cat(["a","a","b","c","b","a","a"]).sed(/b/,/b/) { p }.map
+  end
+
 end
 
 

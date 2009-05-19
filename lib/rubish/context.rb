@@ -68,7 +68,7 @@ class Rubish::Context
       if string
         self.workspace.eval(string)
       else
-        eslf.workspace.eval(&block)
+        self.workspace.eval(&block)
       end
     }
   end

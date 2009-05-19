@@ -100,7 +100,6 @@ class Rubish::Executable
         #io.flush if io.stat.writable?
         #io.flush rescue true # try flushing
       end
-      
       if thread
         begin
           thread.join
@@ -123,17 +122,17 @@ class Rubish::Executable
     self
   end
 
-  def awk(address=nil,&block)
+  def awk(a=nil,b=nil,&block)
     if block
-      Rubish::Awk.new(self).act(&block)
+      Rubish::Awk.new(self).act(a,b,&block)
     else
       Rubish::Awk.new(self)
     end
   end
 
-  def sed(address=nil,&block)
+  def sed(a=nil,b=nil,&block)
     if block
-      Rubish::Sed.new(self).act(&block)  
+      Rubish::Sed.new(self).act(a,b,&block)
     else
       Rubish::Sed.new(self)
     end
