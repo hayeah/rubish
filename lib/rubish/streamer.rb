@@ -289,7 +289,7 @@ class Rubish::Streamer < Rubish::Executable
 
   # size-limited FIFO buffer
   def hold(name,size,val,key=nil)
-    raise "hold size should be larger than 1" unless size > 1
+    raise "hold size should be larger than 1" unless size >= 1
     create_bucket(:hold,name,nil)
     update_bucket(name,val,key) do |acc,val|
       if acc.nil?
