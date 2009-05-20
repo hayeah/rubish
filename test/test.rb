@@ -560,7 +560,7 @@ class Rubish::Test::Context < TUT
     c11 = c1.derive
     c111 = c11.derive
     c12 = c1.derive
-    c2 = Rubish::Context.new(WS)
+    c2 = Rubish::Context.new(Rubish::Workspace.new)
 
     assert_nil c1.parent
     assert_equal c1, c11.parent
@@ -591,7 +591,7 @@ class Rubish::Test::Context < TUT
     derived.o = "o2"
     derived.err = "e2"
 
-    derived.workspace = WS.derive {
+    derived.workspace = Rubish::Workspace.new.derive {
       def foo
         1
       end
