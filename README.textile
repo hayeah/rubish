@@ -506,12 +506,14 @@ In the case of executing a unix command (or pipe), Job#wait would wait for the c
 
 Jobs are registered in a JobControl object,
 
+<pre><code>
   JobControl#wait(*jobs)
     wait for jobs to complete, then unregister them.
   JobControl#waitall
     wait for all jobs to complete
   JobControl#jobs
     all the registered (and active) jobs.
+</code></pre>
 
 <pre><code>
 > job_control
