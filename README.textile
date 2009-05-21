@@ -294,16 +294,21 @@ rbh> p { ls; wc}.map.first.split.first.to_i
 
 An big problem with Bash is when you have to process output with weird characters. Ideally, you might want to say,
 
+<pre><code>
    wc `ls`
+</code></pre>
 
 But that breaks. You have to say,
 
+<pre><code>
   find . -maxdepth 1 -print0 | xargs -0 wc
+</code></pre>
 
 And then again, that only works if you are working with files, and if the command (e.g. wc) accepts multiple arguments. In Rubish, you can use the Executable#q method to tell a command to quote its arguments. Like so,
 
+<pre><code>
   wc(ls.map).q
-
+</code></pre>
 
 h2. Sed and Awk
 
@@ -344,6 +349,7 @@ Rubish::Sed doesn't have the concepts of swapping, appending, modifying, or any 
 
 Awk is a lot like sed. But you can associate actions to be done before or after awk processing.
 
+<pre><code>
   Rubish::Awk#begin(&block)
     block is instance_eval by the Awk object
     before processing.
@@ -354,6 +360,7 @@ Awk is a lot like sed. But you can associate actions to be done before or after 
     block is instance_eval at the end of
     processing. Its value is returned as the
     result.
+</code></pre>
 
 <pre><code>
   rbh> ls.awk { puts do_something(line)}
@@ -396,6 +403,7 @@ Rubish::{Sed,Awk} actually share the Rubish::Streamer mixin. Most of their mecha
 
 Let's see line buffering first.
 
+<pre><code>
   Rubish::Streamer#peek(n=1)
     Return the next n lines (as Array of Strings),
     and put these lines in the stream buffer.
@@ -406,6 +414,7 @@ Let's see line buffering first.
     process next line.
   Rubish::Streamer#quit(n=1)
     Quit the streaming process.
+</pre></code>
 
 By the way, isn't it nice that these methods all have four chars?
 
@@ -416,6 +425,7 @@ By the way, isn't it nice that these methods all have four chars?
 
 In general, the aggregating methods take a name, a value, and an optional key. The aggregated result is accumulated in an instance variable named by the given name. Each aggregator type basically does foldl on an initial value. The optional key is used to partition an aggregation.
 
+<pre><code>
   Rubish::Streamer#count(name,key=nil)
     count number of times it's called.
   Rubish::Streamer#max(name,val,key=nil)
@@ -429,13 +439,15 @@ In general, the aggregating methods take a name, a value, and an optional key. T
     pass the block old_val and new_val, and
     the value returned by block is saved in
     "name".
+</code></pre>
 
 Each aggregator's name is used to create a bucket. A reader method named by name can be used to access that bucket. A bucket is a hash of partitioned accumulation keyed by key. The special key nil aggregates over the entire domain (like MySQL's rollup).
-    
+
+
 <pre><code>
 # find the length of the longest file name, and
 # collect the file names.
-rbh> ls.awk { f=a[0]; max(:fl,f.length,File.extname(f)); collect(:fn,f)}.end { pp buckets; [fl,fl(""),fn] }
+ls.awk { f=a[0]; max(:fl,f.length,File.extname(f)); collect(:fn,f)}.end { pp buckets; [fl,fl(""),fn] }
 {:fl=>{""=>10, nil=>18, ".textile"=>14, ".rb"=>18},
  :fn=>
   {nil=>
@@ -468,6 +480,7 @@ rbh> ls.awk { f=a[0]; max(:fl,f.length,File.extname(f)); collect(:fn,f)}.end { p
   "session.rb",
   "streamer.rb"]]
 </code></pre>
+
 
 The first printout of hash is from @pp buckets@. You can see the aggregation partitioned by file extensions (in the case of @fl@). Note that @fl(nil)@ holds the max length over all the files (the entire domain).
 
