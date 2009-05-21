@@ -39,15 +39,22 @@ A few tips upfront. Sometimes Rubish could mess up your terminal. If that happen
 
 to reset your terminal. Also, Rubish doesn't have shell history. But it uses the readline library, so you can use its history mechanism. C-r <string> to match a previously entered line with string.
 
-If you make changes to Rubish, you hit C-c to go back to irb, and,
+h2. Overview
 
-<pre><code>
-  irb> Rubish.reload
-</code></pre>
+Rubish's Executable class provides a common API for IO redirection and output processing. The subclasses are,
+
+  Command
+    A unix command.
+  Pipe
+    A pipe line of unix commands
+  Awk
+  Sed
+  Batch
+    An arbitrary block of code. Like subshell.
 
 h2. Command
 
-Rubish REPL takes a line and @instance_eval@ s it with the shell session object. If the method is undefined, they call is translated into a Executable object with @method_missing@.
+Rubish REPL takes a line and @instance_eval@ it with the shell object (a Rubish::Context). If the method is undefined, they call is translated into an Executable (Rubish::Command) object with @method_missing@.
 
 <pre><code>
 rbh> ls
@@ -96,7 +103,7 @@ SESSION.RB
 STREAMER.RB
 </code></pre>
 
-Pipe and Command actually share the same parent object: @Rubish::Executable@. So pipes are first class values too!
+Pipes are first class values:
 
 <pre><code>
   rbh> @pipe = p { ls ; tr "a-z A-Z" }; nil
@@ -178,18 +185,28 @@ rbh> cat.i { |p| p.puts((1..10).to_a) }.o {|p| p.each_line {|l| puts l.to_i+100 
 110
 </code></pre>
 
-The input and output blocks are executed in their own threads. Use them at your own peril. Next section shows another way to process output with ruby without using threads.
+The input and output blocks are executed in their own threads. So careful.
 
 h2. Rubish with Ruby
 
 Rubish is designed so it's easy to interface Unix command with Ruby.
 
-  Rubish::Executable#each
+  Rubish::Executable#each(&block)
     yield each line of output to a block.
-  Rubish::Executable#map
+  Rubish::Executable#map(&block)
     Like #each, but collect the values returned by
     the block. If no block given, collect each
     line of the output.
+  Rubish::Executable#head(n=1,&block)
+    Process the first n lines of output
+    with a block.
+  Rubish::Executable#tail(n=1,&block)
+    Process the last n lines of output
+    with a block.
+  Rubish::Executable#first
+    Returns first line of output.
+  Rubish::Executable#last
+    Returns last line of output.
 
 Since this is Ruby, there's no crazy metasyntatic issues when you want to process the output lines.
 
@@ -275,6 +292,18 @@ rbh> p { ls; wc}.map.first.split.first.to_i
 23
 </code></pre>
 
+An big problem with Bash is when you have to process output with weird characters. Ideally, you might want to say,
+
+   wc `ls`
+
+But that breaks. You have to say,
+
+  find . -maxdepth 1 -print0 | xargs -0 wc
+
+And then again, that only works if you are working with files, and if the command (e.g. wc) accepts multiple arguments. In Rubish, you can use the Executable#q method to tell a command to quote its arguments. Like so,
+
+  wc(ls.map).q
+
 
 h2. Sed and Awk
 
@@ -339,6 +368,24 @@ You can associate multiple blocks with either awk or sed. Each block is an "acti
   rbh> cmd.awk.act { ... }.act { ... }
 </code></pre>
 
+Rubish supports awk/sed-style pattern matching.
+
+<pre><code>
+.sed(/a/)  # triggers for lines that matches
+.sed(/a/,/b/) # triggers for lines between (inclusive)
+.sed(1)    # matches line one
+.sed(3,:eof) # matches line 3 to end of stream
+# ditto with awk
+.awk(/a/)
+</code></pre>
+
+<pre><code>
+> cat.i {|p| p.puts((1..10).to_a)}.sed(2,4) { p }
+2
+3
+4
+</code></pre>
+
 
 h2. Streamer
 
@@ -354,7 +401,7 @@ Let's see line buffering first.
     and put these lines in the stream buffer.
   Rubish::Streamer#skip(n=1)
     Skip the next n lines.
-  Rubish::Streamer#next(n=1)
+  Rubish::Streamer#stop(n=1)
     Skip other actions in the streamer, and
     process next line.
   Rubish::Streamer#quit(n=1)
@@ -373,6 +420,7 @@ In general, the aggregating methods take a name, a value, and an optional key. T
     count number of times it's called.
   Rubish::Streamer#max(name,val,key=nil)
   Rubish::Streamer#min(name,val,key=nil)
+  Rubish::Streamer#sum(name,val,key=nil)
   Rubish::Streamer#collect(name,val,key=nil)
     collect vals into an array.
   Rubish::Streamer#hold(name,size,val,key=nil)
@@ -423,6 +471,142 @@ rbh> ls.awk { f=a[0]; max(:fl,f.length,File.extname(f)); collect(:fn,f)}.end { p
 
 The first printout of hash is from @pp buckets@. You can see the aggregation partitioned by file extensions (in the case of @fl@). Note that @fl(nil)@ holds the max length over all the files (the entire domain).
 
+h2. Job Control
+
+All Executable and its subclasses can execute in the background.
+
+  Executable::exec!
+    Execute, immediately return a Job
+  Executable::each!(&block)
+    Iterate the output in the background.
+  Executable::map!(acc,&block)
+    Accumulate output into a thread-safe
+    datastructure with <<
+  
+A Job has the following methods,
+
+  Job#wait
+    Wait for the job to finish. Would block
+    the current thread. Raises if computation
+    ends abnormally.
+  Job#stop
+    Signal for the job to terminate, then wait
+    for it.
+
+In the case of executing a unix command (or pipe), Job#wait would wait for the child process to finish. Job#stop would send SIGTERM to the process, then wait.
+
+<pre><code>
+# slowcat takes 3 seconds to complete
+> @j = slowcat(3).exec!
+# return immediately
+> @j
+#<Job>
+> @j.wait # blocks for three seconds
+</code></pre>
+
+Jobs are registered in a JobControl object,
+
+  JobControl#wait(*jobs)
+    wait for jobs to complete, then unregister them.
+  JobControl#waitall
+    wait for all jobs to complete
+  JobControl#jobs
+    all the registered (and active) jobs.
+
+<pre><code>
+> job_control
+#<Rubish::JobControl>
+> wait(@job)
+# == job_control.wait(@job)
+> waitall # == job_control.wait
+</code></pre>
+
+h2. Context and Workspace
+
+Rubish gives you fine control over the execution context of Executables.
+
+* Contextual IOs are dynamically scoped.
+* Contextual bindings (visible methods) are lexically scoped.
+
+First, contextual IOs
+
+<pre><code>
+with {
+ cmd1.exec
+ cmd2.exec
+ with { cmd3.exec }.o("output-3")
+}.o("output-1-and-2")
+</code></pre>
+
+At the shell, a Workspace object contains all the visible method bindings you can use (as well as methods from Kernel). Everything else translates to a Rubish::Command instance by Workspace#method_missing. To extend a workspace, just mix in modules.
+
+However, it's usually not a good idea to include a module into the Workspace class, since this extension would be visible in all the Workspace instances, thus risking incompatibilities among different extensions. It's better to extend workspace singletons. The philosophy is, a workspace is your own. You have the freedom to mess it up however you like for your personal conveniences. But the messing-it-up should be localized.
+
+  Workspace#derive(*modules)
+    clone the current workspace, then extend the clone with modules.
+
+Ruby doesn't have lexical scoping for methods, but you can fake it by creating modules and deriving workspaces on the fly.
+
+<pre><code>
+with(derive({def foo; ...; end})) {
+  ... # outer foo
+  with(derive({def foo; ...; end})) {
+    ... # inner foo
+  }
+  ... # outer foo
+}
+</code></pre>
+
+The definition block for @derive@ is used by Module.new(&block) to create a dynamic module that's mixed into a derived Workspace.
+
+
+h2. Batch Executable
+
+A batch executable is a block of code executed within a context in a thread. This gives you coarse-grained structured concurrency. It's like subshell, but within the same process, and offers finer control over IO and namespace (i.e. visible bindings).
+
+Schematically, a batch job is like,
+
+<pre><code>
+@job = Thread.new { context.eval { work }}
+@job.wait
+</code></pre>
+
+An example,
+
+<pre><code>
+@b = batch {
+  exec! cmd1, cmd2
+  batch {
+    exec! cmd3, cmd4
+    batch { exec! cmd5 }
+  }.exec  
+}
+@b.exec! # => a job
+</code></pre>
+
+Batches are nestable, such that each batch has its own job control. A batch finishes when all its jobs are terminated, as well as the jobs of all nested job_controls.
+
+Using batches, cocurrent jobs can be organized structurally into a tree.
+
+A batch is just a wrapper over context, you can specify the execution context of a batch,
+
+<pre><code>
+# extend the batch context
+batch(derive(mod1,mod2)) { ... }
+</code></pre>
+
+And a batch is an Executable! So all the Executable methods are applicable:
+
+<pre><code>
+batch { ... }.map { |l| ... }
+batch { ... }.tail
+</code></pre>
+
+
+h2. Remote Scripting
+
+It's fun to think about.
+
 Happy Hacking!
 
 
@@ -431,3 +615,4 @@ h1. Credit
 Created by Howard Yeh.
 
 Gem made available by "Gabriel Horner":http://tagaholic.me/.
+
