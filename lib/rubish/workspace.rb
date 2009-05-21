@@ -28,6 +28,16 @@ class Rubish::Workspace < Rubish::Mu
       end
     end
 
+    def puts(*args)
+      current_context.o.puts(*args)
+      return Rubish::Null
+    end
+
+    def pp(obj)
+      PP.pp(obj,current_context.o)
+      return Rubish::Null
+    end
+
     def cmd(method,*args)
       Rubish::Command.new(method,args)
     end
