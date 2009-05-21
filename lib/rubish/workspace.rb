@@ -145,7 +145,6 @@ class Rubish::Workspace < Rubish::Mu
   attr_accessor :command_factory_hook
   
   def initialize
-    # @vars = {}
     # this is a hack for pipe... dunno if there's a better way to do it.
     @command_factory_hook = nil
     @modules = []
@@ -167,9 +166,6 @@ class Rubish::Workspace < Rubish::Mu
 
   # creates a cloned workspace
   def derive(*modules,&block)
-    # parent_modules = self.modules.dup
-#     new_ws = Rubish::Workspace.new
-#     new_ws.extend(*parent_modules)
     new_ws = self.__clone
     new_ws.extend(*modules,&block)
   end
@@ -201,7 +197,6 @@ class Rubish::Workspace < Rubish::Mu
   end
 
   def to_s
-    # self.__inspect
     "#<#{self.__class}:#{self.__object_id}>"
   end
 
