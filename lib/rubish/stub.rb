@@ -24,8 +24,17 @@ module Rubish
         end
       end
     end
-    
   end
+end
+
+def Rubish(&__block)
+  Rubish::Context.global.eval {
+    begin
+      self.eval(&__block)
+    ensure
+      waitall
+    end
+  }
 end
 
 
