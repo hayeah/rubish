@@ -243,21 +243,21 @@ class Rubish::Test::IO < TUT
     setup_tmp
   end
 
-  should "chomp lines for each/map" do
-    rsh {
-      ints = (1..100).to_a.map { |i| i.to_s }
-      cat.o("output").i { |p| p.puts(ints)}.exec
-      # raw access to pipe would have newlines
-      cat.i("output").o do |p|
-        p.each { |l| assert l.chomp!
-        }
-      end.exec
-      # iterator would've chomped the lines
-      cat.i("output").each do |l|
-        assert_nil l.chomp!
-      end
-    }
-  end
+  # should "chomp lines for each/map" do
+  #   rsh {
+  #     ints = (1..100).to_a.map { |i| i.to_s }
+  #     cat.o("output").i { |p| p.puts(ints)}.exec
+  #     # raw access to pipe would have newlines
+  #     cat.i("output").o do |p|
+  #       p.each { |l| assert l.chomp!
+  #       }
+  #     end.exec
+  #     # iterator would've chomped the lines
+  #     cat.i("output").each do |l|
+  #       assert_nil l.chomp!
+  #     end
+  #   }
+  # end
   
   # should "redirect io" do
   #   rsh {
