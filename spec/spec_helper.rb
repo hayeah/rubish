@@ -11,6 +11,21 @@ def fixture(name)
   File.expand_path("../fixtures/#{name}",__FILE__)
 end
 
+module Helpers
+end
+
+module Helpers::Commands
+  extend self
+  def slow(n)
+    Rubish do
+      cat.i { |p|
+        sleep(n/1000.0)
+        p.puts "done"
+      }.o("/dev/null")
+    end
+  end
+end
+
 RSpec.configure do |config|
   
 end

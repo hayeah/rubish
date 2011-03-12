@@ -1,12 +1,12 @@
 require 'spec_helper'
 
 describe Rubish::Executable do
+  def numbers
+    file = fixture("numbers")
+    Rubish { cat(file) }
+  end
+  
   describe "output processing" do
-    def numbers
-      file = fixture("numbers")
-      Rubish { cat(file) }
-    end
-    
     it "first line of output" do
       numbers.first.should == "1"
     end

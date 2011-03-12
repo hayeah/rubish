@@ -26,16 +26,9 @@ class Rubish::UnixExecutable < Rubish::Executable
     def wait
       raise Rubish::Error.new("already waited") if self.done?
       begin
-        exits = self.pids.map do |pid|
-          Process.wait(pid)
-          $?
-        end
-        @ios.each do |io|
-          io.close
-        end
-        @goods, @bads = exits.partition { |status| status.exitstatus == 0}
+        wait_children_processes
         @result = goods # set result to processes that exit properly
-        if !bads.empty?
+        if !success?
           raise Rubish::Job::Failure.new(self,BadExit.new(bads))
         else
           return self.result
@@ -56,6 +49,24 @@ class Rubish::UnixExecutable < Rubish::Executable
       self.stop("KILL")
     end
 
+    def success?
+      bads.empty?
+    end
+
+    private
+
+    def wait_children_processes
+      @exits = self.pids.map do |pid|
+        Process.wait(pid)
+        $?
+      end
+      
+      @ios.each do |io|
+        io.close
+      end
+
+      @goods, @bads = @exits.partition { |status| status.exitstatus == 0}
+    end
   end
 
   def exec!
@@ -70,5 +81,4 @@ class Rubish::UnixExecutable < Rubish::Executable
   def exec_with(i,o,e)
     raise "abstract"
   end
-
 end
