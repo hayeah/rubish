@@ -40,4 +40,30 @@ describe Rubish::Job do
       @time2.should > 100
     end
   end
+
+  context "stopping a command" do
+    before {
+      @job = slow(1000).exec!
+      # give the forked process time to execute
+      # the command, otherwise the child process
+      # would still be in RSpec
+      sleep(0.1)
+      @job.stop
+    }
+
+    it "is done" do
+      @job.should be_done
+    end
+
+    it "did not succeed" do
+      @job.should_not be_success
+    end
+
+    it "caused the process to exit with a signal" do
+      status = @job.bads.first
+      status.should be_a(Process::Status)
+      status.should be_signaled
+      status.termsig.should == 15
+    end
+  end
 end

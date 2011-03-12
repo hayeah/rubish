@@ -5,6 +5,7 @@ class Rubish::UnixExecutable < Rubish::Executable
     attr_reader :pids
     attr_reader :goods
     attr_reader :bads
+    attr_reader :statuses
 
     class BadExit < RuntimeError
       attr_reader :exitstatuses
@@ -27,12 +28,7 @@ class Rubish::UnixExecutable < Rubish::Executable
       raise Rubish::Error.new("already waited") if self.done?
       begin
         wait_children_processes
-        @result = goods # set result to processes that exit properly
-        if !success?
-          raise Rubish::Job::Failure.new(self,BadExit.new(bads))
-        else
-          return self.result
-        end
+        @result = success?
       ensure
         __finish
       end
@@ -56,7 +52,7 @@ class Rubish::UnixExecutable < Rubish::Executable
     private
 
     def wait_children_processes
-      @exits = self.pids.map do |pid|
+      @statuses = self.pids.map do |pid|
         Process.wait(pid)
         $?
       end
@@ -65,7 +61,7 @@ class Rubish::UnixExecutable < Rubish::Executable
         io.close
       end
 
-      @goods, @bads = @exits.partition { |status| status.exitstatus == 0}
+      @goods, @bads = @statuses.partition { |status| status.exitstatus == 0}
     end
   end
 

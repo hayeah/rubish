@@ -238,6 +238,11 @@ class Rubish::Executable::ExecutableIO
     if thread
       begin
         thread.join
+        # TODO uh. I don't know if i should rescue
+        # errors raised in the thread that
+        # controls a pipe
+      rescue => e
+        puts e
       ensure
         if thread.alive?
           thread.kill
