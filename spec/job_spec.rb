@@ -9,7 +9,7 @@ describe Rubish::Job do
     return (Time.now - t1) * 1000
   end
   
-  context "running command in background" do
+  context "running a job in background" do
     before {
       @time1 = elapsed {
         @job = slow(100).exec!
@@ -41,14 +41,14 @@ describe Rubish::Job do
     end
   end
 
-  context "stopping a command" do
+  context "killing a job" do
     before {
       @job = slow(1000).exec!
       # give the forked process time to execute
       # the command, otherwise the child process
       # would still be in RSpec
       sleep(0.1)
-      @job.stop
+      @job.kill
     }
 
     it "is done" do

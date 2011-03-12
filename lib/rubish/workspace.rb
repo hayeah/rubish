@@ -117,8 +117,8 @@ class Rubish::Workspace < Rubish::Mu
       job_control.waitall
     end
 
-    def stop(job)
-      job_control.stop(job)
+    def kill(job)
+      job_control.kill(job)
     end
 
     def jobs

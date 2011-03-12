@@ -1,7 +1,3 @@
-
-# A job is not necessarily registered with job
-# control.
-
 # TODO extend this for bg/fg (maybe?)
 # Assume that job control is used by a single thread...
 
@@ -16,14 +12,13 @@ class Rubish::JobControl
 
   def initialize
     @mutex = Mutex.new
-    @jobs = { }
+    @jobs = {}
   end
 
   def jobs
     @jobs.values
   end
 
-  # need to synchronize access to the jobs hash
   def submit(job)
     raise "expects a Rubish::JobControl::Job" unless job.is_a?(Rubish::Job)
     @mutex.synchronize {

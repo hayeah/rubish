@@ -34,15 +34,11 @@ class Rubish::UnixExecutable < Rubish::Executable
       end
     end
 
-    def stop(sig="TERM")
+    def kill(sig="TERM")
       self.pids.each do |pid|
         Process.kill(sig,pid)
       end
       self.wait
-    end
-
-    def stop!
-      self.stop("KILL")
     end
 
     def success?

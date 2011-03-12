@@ -48,7 +48,7 @@ class Rubish::Job
   end
 
   # MUST result in calling __finish
-  def stop
+  def kill
     raise "abstract"
   end
 
@@ -82,7 +82,7 @@ class Rubish::Job::ThreadJob < Rubish::Job
     end
   end
 
-  def stop
+  def kill
     @thread.kill
     wait
   end
