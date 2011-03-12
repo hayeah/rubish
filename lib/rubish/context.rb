@@ -6,20 +6,32 @@ class Rubish::Context
                               $stdin,$stdout,$stderr)
     end
     alias_method :global, :singleton
+
+    attr_reader :current
     
     def current
-      Thread.current["rubish.context"] || self.singleton
+      @current || self.global
+      #Thread.current["rubish.context"] || self.singleton
     end
 
     def as_current(context,&block)
-      raise "expects a context" unless context.is_a?(Rubish::Context)
       begin
-        old_context = Thread.current["rubish.context"]
-        Thread.current["rubish.context"] = context
+        old_context = @current
+        @current = context
         block.call
       ensure
-        Thread.current["rubish.context"] = old_context
+        @current = old_context
       end
+      # WTF was i doing? I don't remember why it needs to be Thread local
+      
+      # raise "expects a context" unless context.is_a?(Rubish::Context)
+      # begin
+      #   old_context = Thread.current["rubish.context"]
+      #   Thread.current["rubish.context"] = context
+      #   block.call
+      # ensure
+      #   Thread.current["rubish.context"] = old_context
+      # end
     end
   end
 
