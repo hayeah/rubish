@@ -1,119 +1,5 @@
 class Rubish::Executable
 
-  class ExecutableIO
-    class << self
-      # transactionally open a bunch of ios
-      # if one fails to open, close all others.
-      def ios(*specs)
-        success = false
-        begin
-          exe_ios = []
-          specs.each do |(spec,mode)|
-            exe_ios << prepare_io(spec,mode)
-          end
-          success =true
-          return exe_ios
-        ensure
-          unless success
-            exe_ios.each { |exe_io|
-              exe_io.close
-            }
-          end
-        end
-      end
-      
-      private
-      # sorry, this is pretty hairy. This method
-      # instructs how exec should handle IO. (whether
-      # IO is done in a thread. whether it needs to be
-      # closed. (so on))
-      #
-      # an io could be
-      # String: interpreted as file name
-      # Number: file descriptor
-      # IO: Ruby IO object
-      # Block: executed in a thread, and a pipe connects the executable and the thread.
-      def prepare_io(io,mode)
-        # if the io given is a block, we execute it in a thread (passing it a pipe)
-        raise "invalid io mode: #{mode}" unless mode == "w" || mode == "r"
-        result =
-          case io
-          when $stdin, $stdout, $stderr
-            [io, false, nil]
-          when String
-            path = File.expand_path(io)
-            raise "path is a directory" if File.directory?(path)
-            [File.new(path,mode), true, nil]
-          when IO
-            [io, false,nil] 
-          when Proc
-            proc = io
-            r,w = IO.pipe
-            # if we want to use a block to
-            # (1) input into executable
-            #   - return "r" end from prepare_io, and
-            #   the executable use this and standard
-            #   input.
-            #   - let the thread block writes to the "w" end
-            # (2) read from executable
-            #   - return "w" from prepare_io
-            #   - let thread reads from "r"
-            return_io, thread_io =
-              case mode
-                # case 1
-              when "r"
-                [r,w]
-              when "w"
-                # case 2
-                [w,r]
-              end
-            thread = Thread.new do
-            begin
-              proc.call(thread_io)
-            ensure
-              thread_io.close
-            end
-          end
-            [return_io, true, thread]
-          else
-            raise "not a valid input: #{io}"
-          end
-        return self.new(*result)
-      end
-
-    end
-
-    attr_reader :thread
-    attr_reader :io
-    attr_reader :auto_close
-    
-    def initialize(io,auto_close,thread)
-      @io = io
-      @auto_close = auto_close
-      @thread = thread
-    end
-
-    def close
-      if auto_close
-        io.close
-      else
-        #io.flush if io.stat.writable?
-        #io.flush rescue true # try flushing
-      end
-      if thread
-        begin
-          thread.join
-        ensure
-          if thread.alive?
-            thread.kill
-          end
-        end
-      end
-    end
-  end
-
-  
-  
   attr_reader :working_directory
 
   # only changes working directory for this executable
@@ -245,7 +131,116 @@ class Rubish::Executable
   def last
     tail(1).first
   end
+end
 
+class Rubish::Executable::ExecutableIO
+  class << self
+    # transactionally open a bunch of ios
+    # if one fails to open, close all others.
+    def ios(*specs)
+      success = false
+      begin
+        exe_ios = []
+        specs.each do |(spec,mode)|
+          exe_ios << prepare_io(spec,mode)
+        end
+        success =true
+        return exe_ios
+      ensure
+        unless success
+          exe_ios.each { |exe_io|
+            exe_io.close
+          }
+        end
+      end
+    end
+    
+    private
+    # sorry, this is pretty hairy. This method
+    # instructs how exec should handle IO. (whether
+    # IO is done in a thread. whether it needs to be
+    # closed. (so on))
+    #
+    # an io could be
+    # String: interpreted as file name
+    # Number: file descriptor
+    # IO: Ruby IO object
+    # Block: executed in a thread, and a pipe connects the executable and the thread.
+    def prepare_io(io,mode)
+      # if the io given is a block, we execute it in a thread (passing it a pipe)
+      raise "invalid io mode: #{mode}" unless mode == "w" || mode == "r"
+      result =
+        case io
+        when $stdin, $stdout, $stderr
+          [io, false, nil]
+        when String
+          path = File.expand_path(io)
+          raise "path is a directory" if File.directory?(path)
+          [File.new(path,mode), true, nil]
+        when IO
+          [io, false,nil] 
+        when Proc
+          proc = io
+          r,w = IO.pipe
+          # if we want to use a block to
+          # (1) input into executable
+          #   - return "r" end from prepare_io, and
+          #   the executable use this and standard
+          #   input.
+          #   - let the thread block writes to the "w" end
+          # (2) read from executable
+          #   - return "w" from prepare_io
+          #   - let thread reads from "r"
+          return_io, thread_io =
+            case mode
+              # case 1
+            when "r"
+              [r,w]
+            when "w"
+              # case 2
+              [w,r]
+            end
+          thread = Thread.new do
+          begin
+            proc.call(thread_io)
+          ensure
+            thread_io.close
+          end
+        end
+          [return_io, true, thread]
+        else
+          raise "not a valid input: #{io}"
+        end
+      return self.new(*result)
+    end
+
+  end
+
+  attr_reader :thread
+  attr_reader :io
+  attr_reader :auto_close
   
-  
+  def initialize(io,auto_close,thread)
+    @io = io
+    @auto_close = auto_close
+    @thread = thread
+  end
+
+  def close
+    if auto_close
+      io.close
+    else
+      #io.flush if io.stat.writable?
+      #io.flush rescue true # try flushing
+    end
+    if thread
+      begin
+        thread.join
+      ensure
+        if thread.alive?
+          thread.kill
+        end
+      end
+    end
+  end
 end
