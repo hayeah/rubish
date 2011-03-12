@@ -3,12 +3,6 @@ require 'spec_helper'
 describe "Job Control" do
   include Helpers::Commands
 
-  def elapsed
-    t1 = Time.now
-    yield
-    return (Time.now - t1) * 1000
-  end
-  
   let(:job_control) { Rubish::Context.current.job_control }
 
   def jobs

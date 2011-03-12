@@ -2,12 +2,6 @@ require 'spec_helper'
 
 describe Rubish::Job do
   include Helpers::Commands
-
-  def elapsed
-    t1 = Time.now
-    yield
-    return (Time.now - t1) * 1000
-  end
   
   context "running a job in background" do
     before {

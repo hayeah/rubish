@@ -11,6 +11,12 @@ def fixture(name)
   File.expand_path("../fixtures/#{name}",__FILE__)
 end
 
+def elapsed
+  t1 = Time.now
+  yield
+  return (Time.now - t1) * 1000
+end
+
 module Helpers
 end
 
