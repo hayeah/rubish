@@ -259,28 +259,28 @@ class Rubish::Test::IO < TUT
     }
   end
   
-  should "redirect io" do
-    rsh {
-      ints = (1..100).to_a.map { |i| i.to_s }
-      cat.o("output").i { |p| p.puts(ints)}.exec
-      assert_equal ints, cat.i("output").map
-      assert_equal ints, p { cat; cat; cat}.i("output").map
-      assert_equal ints, cat.i { |p| p.puts(ints) }.map
-    }
-  end
+  # should "redirect io" do
+  #   rsh {
+  #     ints = (1..100).to_a.map { |i| i.to_s }
+  #     cat.o("output").i { |p| p.puts(ints)}.exec
+  #     assert_equal ints, cat.i("output").map
+  #     assert_equal ints, p { cat; cat; cat}.i("output").map
+  #     assert_equal ints, cat.i { |p| p.puts(ints) }.map
+  #   }
+  # end
 
-  should "close pipes used for io redirects" do
-    rsh {
-      ios = IOHelper.created_ios do
-        cat.i { |p| p.puts "foobar" }.o { |p| p.readlines }.exec
-      end
-      assert ios.all? { |io| io.closed? }
-      ios = IOHelper.created_ios do
-        cat.i { |p| p.puts "foobar" }.o("output").exec
-      end
-      assert ios.all? { |io| io.closed? }
-    }
-  end
+  # should "close pipes used for io redirects" do
+  #   rsh {
+  #     ios = IOHelper.created_ios do
+  #       cat.i { |p| p.puts "foobar" }.o { |p| p.readlines }.exec
+  #     end
+  #     assert ios.all? { |io| io.closed? }
+  #     ios = IOHelper.created_ios do
+  #       cat.i { |p| p.puts "foobar" }.o("output").exec
+  #     end
+  #     assert ios.all? { |io| io.closed? }
+  #   }
+  # end
 
   should "not close stdioe" do
     rsh {
