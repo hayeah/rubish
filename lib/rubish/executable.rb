@@ -68,6 +68,7 @@ class Rubish::Executable
     @__io_err = io
   end
 
+  # async version of each
   def each!
     self.o do |pipe|
       pipe.each_line do |line|
@@ -83,7 +84,8 @@ class Rubish::Executable
     job = self.each! &block
     job.wait
   end
-  
+
+  # async version of map
   # acc is the accumulator passed in by reference, and updated destructively.
   def map!(acc,&block)
     acc = Array.new unless acc

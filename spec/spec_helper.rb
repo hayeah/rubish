@@ -7,6 +7,10 @@ require 'rubish'
 # in ./support/ and its subdirectories.
 Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each {|f| require f}
 
+def fixture(name)
+  File.expand_path("../fixtures/#{name}",__FILE__)
+end
+
 RSpec.configure do |config|
   
 end

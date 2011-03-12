@@ -2,10 +2,6 @@ require "spec_helper"
 require 'tempfile'
 
 describe "IO" do
-  def fixture(name)
-    File.expand_path("../fixtures/#{name}",__FILE__)
-  end
-
   context "redirection" do
     it "redirects STDOUT to ruby pipes" do
       file = fixture("numbers")
