@@ -16,12 +16,12 @@ end
 
 module Helpers::Commands
   extend self
+
+  # a command that does not return until n-milleseconds later
   def slow(n)
+    # p File.expand_path("../script/slowcat.rb",__FILE__)
     Rubish do
-      cat.i { |p|
-        sleep(n/1000.0)
-        p.puts "done"
-      }.o("/dev/null")
+      ruby(File.expand_path("../script/slowcat.rb",__FILE__),n.to_s)
     end
   end
 end
